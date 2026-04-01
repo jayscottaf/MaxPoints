@@ -48,7 +48,6 @@ export default function Dashboard() {
   }
 
   const handleUsageUpdate = (perkId: string, amount: number) => {
-    // Update local state
     setPerks(prevPerks =>
       prevPerks.map(perk =>
         perk.id === perkId
@@ -56,12 +55,9 @@ export default function Dashboard() {
           : perk
       )
     )
-
-    // Refresh cards data
     fetchCards()
   }
 
-  // Calculate totals
   const totalAnnualFees = cards.reduce((sum, card) => sum + card.annualFee, 0)
   const totalPerksValue = cards.reduce(
     (sum, card) => sum + (card.perks?.reduce((s: number, p: any) => s + p.maxValue, 0) || 0),
@@ -75,23 +71,23 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
+        <div className="text-lg text-zinc-300">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0f1117]">
       <Toaster position="top-right" />
 
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-[#1a1b23] border-b border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <CreditCard className="h-8 w-8 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">MaxPoints</h1>
+              <CreditCard className="h-8 w-8 text-blue-500" />
+              <h1 className="text-2xl font-bold text-white">MaxPoints</h1>
             </div>
             <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <Bell className="h-5 w-5" />
@@ -104,46 +100,46 @@ export default function Dashboard() {
       {/* Summary Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Annual Fees</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(totalAnnualFees)}</p>
+                <p className="text-sm text-zinc-400">Total Annual Fees</p>
+                <p className="text-2xl font-bold mt-1 text-white">{formatCurrency(totalAnnualFees)}</p>
               </div>
-              <CreditCard className="h-8 w-8 text-gray-400" />
+              <CreditCard className="h-8 w-8 text-zinc-600" />
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Perks Value</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(totalPerksValue)}</p>
+                <p className="text-sm text-zinc-400">Total Perks Value</p>
+                <p className="text-2xl font-bold mt-1 text-blue-400">{formatCurrency(totalPerksValue)}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
+              <TrendingUp className="h-8 w-8 text-blue-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Used to Date</p>
-                <p className="text-2xl font-bold mt-1 text-green-600">{formatCurrency(totalUsed)}</p>
+                <p className="text-sm text-zinc-400">Used to Date</p>
+                <p className="text-2xl font-bold mt-1 text-emerald-400">{formatCurrency(totalUsed)}</p>
               </div>
-              <Calendar className="h-8 w-8 text-green-600" />
+              <Calendar className="h-8 w-8 text-emerald-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Net Cost</p>
-                <p className={`text-2xl font-bold mt-1 ${netCost <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className="text-sm text-zinc-400">Net Cost</p>
+                <p className={`text-2xl font-bold mt-1 ${netCost <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(netCost)}
                 </p>
               </div>
-              <div className={`h-8 w-8 rounded-full ${netCost <= 0 ? 'bg-green-100' : 'bg-red-100'} flex items-center justify-center`}>
-                <span className={`text-sm font-bold ${netCost <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`h-8 w-8 rounded-full ${netCost <= 0 ? 'bg-emerald-900/50' : 'bg-red-900/50'} flex items-center justify-center`}>
+                <span className={`text-sm font-bold ${netCost <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {netCost <= 0 ? '+' : '-'}
                 </span>
               </div>
@@ -152,7 +148,7 @@ export default function Dashboard() {
         </div>
 
         {/* Cards Grid */}
-        <h2 className="text-xl font-semibold mb-4">Your Cards</h2>
+        <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.map(card => (
             <CardSummary key={card.id} card={card} onSelect={setSelectedCard} />
@@ -162,13 +158,13 @@ export default function Dashboard() {
 
       {/* Perks Modal */}
       {showPerkModal && selectedCard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{selectedCard.name} Perks</h2>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1a1b23] border border-zinc-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white">{selectedCard.name} Perks</h2>
               <button
                 onClick={() => setShowPerkModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>

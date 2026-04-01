@@ -59,55 +59,55 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const getStatusIcon = () => {
     switch (status) {
       case 'completed':
-        return <Check className="h-5 w-5 text-green-600" />
+        return <Check className="h-5 w-5 text-emerald-400" />
       case 'expiring':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />
+        return <AlertTriangle className="h-5 w-5 text-yellow-400" />
       case 'in-progress':
-        return <Clock className="h-5 w-5 text-blue-600" />
+        return <Clock className="h-5 w-5 text-blue-400" />
       default:
-        return <DollarSign className="h-5 w-5 text-gray-400" />
+        return <DollarSign className="h-5 w-5 text-zinc-500" />
     }
   }
 
   const getStatusColor = () => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800'
+        return 'bg-emerald-900/50 text-emerald-300'
       case 'expiring':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-900/50 text-yellow-300'
       case 'in-progress':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-900/50 text-blue-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-zinc-800 text-zinc-300'
     }
   }
 
   return (
-    <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="border border-zinc-800 rounded-lg p-4 hover:border-zinc-600 transition-colors">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-start space-x-3">
           {getStatusIcon()}
           <div className="flex-1">
-            <h4 className="font-medium">{perk.name}</h4>
+            <h4 className="font-medium text-white">{perk.name}</h4>
             {perk.description && (
-              <p className="text-sm text-gray-600 mt-1">{perk.description}</p>
+              <p className="text-sm text-zinc-400 mt-1">{perk.description}</p>
             )}
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor()}`}>
                 {status.replace('-', ' ')}
               </span>
               {perk.enrollmentRequired && (
-                <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                <span className="text-xs px-2 py-1 rounded-full bg-purple-900/50 text-purple-300">
                   Enrollment Required
                 </span>
               )}
               {perk.category && (
-                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                <span className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">
                   {perk.category}
                 </span>
               )}
               {daysRemaining !== null && daysRemaining <= 30 && (
-                <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-800">
+                <span className="text-xs px-2 py-1 rounded-full bg-orange-900/50 text-orange-300">
                   {daysRemaining} days left
                 </span>
               )}
@@ -119,17 +119,17 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       <div className="space-y-3">
         <div>
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-600">
+            <span className="text-zinc-400">
               {formatCurrency(currentUsage)} / {formatCurrency(perk.maxValue)}
             </span>
-            <span className="font-medium">{percentUsed}%</span>
+            <span className="font-medium text-zinc-200">{percentUsed}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-zinc-800 rounded-full h-2">
             <div
               className={`h-2 rounded-full transition-all ${
-                percentUsed === 100 ? 'bg-green-600' :
-                percentUsed > 75 ? 'bg-yellow-600' :
-                'bg-blue-600'
+                percentUsed === 100 ? 'bg-emerald-500' :
+                percentUsed > 75 ? 'bg-yellow-500' :
+                'bg-blue-500'
               }`}
               style={{ width: `${percentUsed}%` }}
             />
@@ -141,7 +141,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             {!isLogging ? (
               <button
                 onClick={() => setIsLogging(true)}
-                className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800"
+                className="flex items-center space-x-1 text-sm text-blue-400 hover:text-blue-300"
               >
                 <Plus className="h-4 w-4" />
                 <span>Log Usage</span>
@@ -153,7 +153,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="Amount"
-                  className="px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   step="0.01"
                   min="0"
                   max={perk.maxValue - currentUsage}
@@ -169,7 +169,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                     setIsLogging(false)
                     setAmount('')
                   }}
-                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                  className="px-3 py-1 text-sm text-zinc-400 hover:text-zinc-200"
                 >
                   Cancel
                 </button>
