@@ -3,13 +3,31 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
+    const user = await prisma.user.findFirst()
+
     const cards = await prisma.card.findMany({
       include: {
-        perks: true,
+        perks: {
+          include: {
+            usage: user ? {
+              where: { userId: user.id }
+            } : false
+          }
+        },
         userCards: true
       }
     })
-    return NextResponse.json(cards)
+
+    // Attach currentUsage to each perk
+    const cardsWithUsage = cards.map(card => ({
+      ...card,
+      perks: card.perks.map(perk => {
+        const currentUsage = perk.usage.reduce((sum, u) => sum + u.amount, 0)
+        return { ...perk, currentUsage }
+      })
+    }))
+
+    return NextResponse.json(cardsWithUsage)
   } catch (error) {
     console.error('Error fetching cards:', error)
     return NextResponse.json({ error: 'Failed to fetch cards' }, { status: 500 })
