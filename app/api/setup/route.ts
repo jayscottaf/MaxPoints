@@ -7,7 +7,9 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     // Check if database is already set up
-    const userCount = await prisma.user.count()
+    let userCount = 0
+    try {
+      userCount = await prisma.user.count()
     if (userCount > 0) {
       return NextResponse.json({
         message: 'Database already initialized',
