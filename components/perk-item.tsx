@@ -37,8 +37,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           perkId: perk.id,
-          amount: usageAmount,
-          userId: 'user-default'
+          amount: usageAmount
         })
       })
 

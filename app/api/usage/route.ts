@@ -4,10 +4,14 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId') || 'user-default'
     const perkId = searchParams.get('perkId')
 
-    let where: any = { userId }
+    const user = await prisma.user.findFirst()
+    if (!user) {
+      return NextResponse.json({ error: 'No user found' }, { status: 404 })
+    }
+
+    let where: any = { userId: user.id }
     if (perkId) {
       where.perkId = perkId
     }
@@ -36,7 +40,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId = 'user-default', perkId, amount, notes } = body
+    const { perkId, amount, notes } = body
+
+    // Resolve the default user
+    const user = await prisma.user.findFirst()
+    if (!user) {
+      return NextResponse.json({ error: 'No user found' }, { status: 404 })
+    }
+    const userId = user.id
 
     // Check if this would exceed the perk's max value
     const perk = await prisma.perk.findUnique({

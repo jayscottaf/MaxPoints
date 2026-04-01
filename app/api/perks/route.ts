@@ -6,7 +6,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const cardId = searchParams.get('cardId')
-    const userId = searchParams.get('userId') || 'user-default'
+
+    const user = await prisma.user.findFirst()
+    const userId = user?.id
 
     let where: any = {}
     if (cardId) {

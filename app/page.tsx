@@ -38,7 +38,7 @@ export default function Dashboard() {
 
   const fetchPerks = async (cardId: string) => {
     try {
-      const response = await fetch(`/api/perks?cardId=${cardId}&userId=user-default`)
+      const response = await fetch(`/api/perks?cardId=${cardId}`)
       const data = await response.json()
       setPerks(data)
       setShowPerkModal(true)
