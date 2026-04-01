@@ -1,6 +1,0 @@
-{
-  "buildCommand": "prisma generate && next build",
-  "env": {
-    "NODE_ENV": "production"
-  }
-}
