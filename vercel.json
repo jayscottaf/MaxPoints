@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm install && npx prisma generate",
+  "buildCommand": "prisma generate && next build",
   "env": {
     "NODE_ENV": "production"
   }
