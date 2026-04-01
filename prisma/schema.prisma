@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  timezone          String   @default("America/New_York")
+  notificationPrefs Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  cards         UserCard[]
+  usage         Usage[]
+  notifications Notification[]
+}
+
+model Card {
+  id         String   @id @default(cuid())
+  name       String
+  issuer     String
+  annualFee  Float
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  perks     Perk[]
+  userCards UserCard[]
+  deals     Deal[]
+}
+
+model UserCard {
+  id          String    @id @default(cuid())
+  userId      String
+  cardId      String
+  renewalDate DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId])
+}
+
+model Perk {
+  id                 String    @id @default(cuid())
+  cardId             String
+  name               String
+  description        String?
+  maxValue           Float
+  periodType         String // "annual", "quarterly", "semi-annual", "monthly", "one-time"
+  startDate          DateTime?
+  endDate            DateTime?
+  enrollmentRequired Boolean   @default(false)
+  category           String?   // "travel", "dining", "shopping", "entertainment", "wellness"
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  card  Card    @relation(fields: [cardId], references: [id])
+  usage Usage[]
+}
+
+model Usage {
+  id        String   @id @default(cuid())
+  userId    String
+  perkId    String
+  amount    Float
+  date      DateTime @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  perk Perk @relation(fields: [perkId], references: [id])
+}
+
+model Deal {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  cardIds     String[] // Array of card IDs this deal applies to
+  expiryDate  DateTime?
+  source      String // "doctor-of-credit", "the-points-guy", etc.
+  sourceUrl   String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  cards Card[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // "expiring", "available", "deal", "reminder"
+  title     String
+  message   String
+  metadata  Json?
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
