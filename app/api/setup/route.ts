@@ -10,15 +10,19 @@ export async function GET(request: NextRequest) {
     let userCount = 0
     try {
       userCount = await prisma.user.count()
-    if (userCount > 0) {
-      return NextResponse.json({
-        message: 'Database already initialized',
-        stats: {
-          users: await prisma.user.count(),
-          cards: await prisma.card.count(),
-          perks: await prisma.perk.count()
-        }
-      })
+      if (userCount > 0) {
+        return NextResponse.json({
+          message: 'Database already initialized',
+          stats: {
+            users: await prisma.user.count(),
+            cards: await prisma.card.count(),
+            perks: await prisma.perk.count()
+          }
+        })
+      }
+    } catch (countError) {
+      // Tables don't exist yet, continue with setup
+      console.log('Tables not found, will create them')
     }
 
     // Create default user
