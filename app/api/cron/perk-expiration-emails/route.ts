@@ -17,11 +17,10 @@ type Candidate = PerkExpirationEmailItem & {
   reminderKey: string
 }
 
-function parseReminderDays(request: NextRequest) {
-  const dryRun = request.nextUrl.searchParams.get('dryRun') === '1'
+function parseReminderDays(request: NextRequest, allowOverride: boolean) {
   const override = request.nextUrl.searchParams.get('days')
 
-  if (!dryRun || !override) {
+  if (!allowOverride || !override) {
     return DEFAULT_REMINDER_DAYS
   }
 
@@ -75,7 +74,8 @@ export async function GET(request: NextRequest) {
   }
 
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1'
-  const reminderDays = parseReminderDays(request)
+  const testSend = request.nextUrl.searchParams.get('testSend') === '1'
+  const reminderDays = parseReminderDays(request, dryRun || testSend)
   const today = startOfDay(new Date())
   const userCards = await prisma.userCard.findMany({
     where: { isActive: true },
@@ -211,6 +211,18 @@ export async function GET(request: NextRequest) {
     appUrl,
     items: candidates,
   })
+
+  if (testSend) {
+    return NextResponse.json({
+      ok: true,
+      testSend: true,
+      scannedPerks,
+      sent: true,
+      emailId: emailResult?.id,
+      recipient: to,
+      candidateCount: candidates.length,
+    })
+  }
 
   await prisma.notification.createMany({
     data: candidates.map((candidate) => ({
