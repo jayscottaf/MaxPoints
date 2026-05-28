@@ -14,6 +14,7 @@ function getUpcomingUnusedPerks(perks: any[]) {
   return perks
     .map((perk) => ({
       ...perk,
+      isOneTime: perk.periodType === 'one-time',
       daysLeft: perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null,
     }))
     .filter((perk) =>
@@ -24,6 +25,10 @@ function getUpcomingUnusedPerks(perks: any[]) {
       perk.daysLeft >= 0
     )
     .sort((a, b) => {
+      if (a.isOneTime !== b.isOneTime) {
+        return a.isOneTime ? 1 : -1
+      }
+
       if (a.daysLeft !== b.daysLeft) {
         return a.daysLeft - b.daysLeft
       }
@@ -37,12 +42,22 @@ function getUpcomingUnusedPerks(perks: any[]) {
     })
 }
 
-function getDueUrgency(daysLeft: number) {
+function getDueUrgency(daysLeft: number, isOneTime: boolean) {
+  if (isOneTime) {
+    return {
+      badge: 'bg-purple-900/50 text-purple-200 border-purple-700/50',
+      accent: 'border-l-purple-500',
+      label: 'one-time',
+      showAlert: false,
+    }
+  }
+
   if (daysLeft === 0) {
     return {
       badge: 'bg-red-900/60 text-red-200 border-red-700/60',
       accent: 'border-l-red-500',
       label: 'Due today',
+      showAlert: true,
     }
   }
 
@@ -51,6 +66,7 @@ function getDueUrgency(daysLeft: number) {
       badge: 'bg-orange-900/50 text-orange-200 border-orange-700/60',
       accent: 'border-l-orange-500',
       label: `${daysLeft} days left`,
+      showAlert: true,
     }
   }
 
@@ -59,6 +75,7 @@ function getDueUrgency(daysLeft: number) {
       badge: 'bg-yellow-900/50 text-yellow-200 border-yellow-700/60',
       accent: 'border-l-yellow-500',
       label: `${daysLeft} days left`,
+      showAlert: true,
     }
   }
 
@@ -66,6 +83,7 @@ function getDueUrgency(daysLeft: number) {
     badge: 'bg-blue-900/40 text-blue-200 border-blue-700/50',
     accent: 'border-l-blue-500',
     label: `${daysLeft} days left`,
+    showAlert: false,
   }
 }
 
@@ -243,12 +261,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <section className="mb-8">
+        {/* Cards Grid */}
+        <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {cards.map(card => (
+            <CardSummary key={card.id} card={card} onSelect={setSelectedCard} />
+          ))}
+        </div>
+
+        <section>
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
             <div>
               <h2 className="text-xl font-semibold text-white">Unused Perks Coming Due</h2>
               <p className="text-sm text-zinc-400 mt-1">
-                Unused credits and one-time perks sorted by the next expiration date.
+                Unused recurring credits first, with one-time perks kept below them.
               </p>
             </div>
             {upcomingUnusedPerks.length > DUE_PERKS_COLLAPSED_COUNT && (
@@ -269,7 +295,7 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {visibleDuePerks.map((perk) => {
-                const urgency = getDueUrgency(perk.daysLeft)
+                const urgency = getDueUrgency(perk.daysLeft, perk.isOneTime)
 
                 return (
                   <button
@@ -281,14 +307,9 @@ export default function Dashboard() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${urgency.badge}`}>
-                            {perk.daysLeft <= 30 && <AlertTriangle className="h-3 w-3" />}
+                            {urgency.showAlert && <AlertTriangle className="h-3 w-3" />}
                             {urgency.label}
                           </span>
-                          {perk.periodType === 'one-time' && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-purple-900/50 text-purple-200 border border-purple-700/50">
-                              one-time
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm text-zinc-400">{perk.card?.name}</p>
                         <h3 className="font-semibold text-white truncate">{perk.name}</h3>
@@ -300,7 +321,7 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
                       <Calendar className="h-4 w-4 text-zinc-500" />
-                      <span>Due {formatDateOnly(perk.periodEnd)}</span>
+                      <span>{perk.isOneTime ? 'Track by benefit cycle' : `Due ${formatDateOnly(perk.periodEnd)}`}</span>
                     </div>
                   </button>
                 )
@@ -308,14 +329,6 @@ export default function Dashboard() {
             </div>
           )}
         </section>
-
-        {/* Cards Grid */}
-        <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cards.map(card => (
-            <CardSummary key={card.id} card={card} onSelect={setSelectedCard} />
-          ))}
-        </div>
       </div>
 
       {/* Perks Modal */}
