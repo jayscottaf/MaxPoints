@@ -17,6 +17,40 @@ export function formatDate(date: Date | string): string {
   return format(new Date(date), 'MMM d, yyyy')
 }
 
+function getDateOnlyParts(date: Date | string) {
+  if (typeof date === 'string') {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      return {
+        year: Number(match[1]),
+        month: Number(match[2]) - 1,
+        day: Number(match[3]),
+      }
+    }
+  }
+
+  const parsed = new Date(date)
+  return {
+    year: parsed.getUTCFullYear(),
+    month: parsed.getUTCMonth(),
+    day: parsed.getUTCDate(),
+  }
+}
+
+export function formatDateOnly(date: Date | string): string {
+  const { year, month, day } = getDateOnlyParts(date)
+  return format(new Date(year, month, day), 'MMM d, yyyy')
+}
+
+export function isPastDateOnly(date: Date | string): boolean {
+  const { year, month, day } = getDateOnlyParts(date)
+  const today = new Date()
+  const targetDay = new Date(year, month, day)
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+  return targetDay < todayOnly
+}
+
 export function daysUntil(date: Date | string): number {
   return differenceInDays(new Date(date), new Date())
 }

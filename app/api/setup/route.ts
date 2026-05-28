@@ -151,21 +151,21 @@ export async function GET(request: NextRequest) {
         data: {
           userId: user.id,
           cardId: 'amex-platinum',
-          renewalDate: new Date('2025-10-20')
+          renewalDate: new Date('2026-10-20')
         }
       }),
       prisma.userCard.create({
         data: {
           userId: user.id,
           cardId: 'amex-hilton-aspire',
-          renewalDate: new Date('2025-11-22')
+          renewalDate: new Date('2026-11-22')
         }
       }),
       prisma.userCard.create({
         data: {
           userId: user.id,
           cardId: 'chase-reserve',
-          renewalDate: new Date('2025-01-01')
+          renewalDate: new Date('2027-01-01')
         }
       })
     ])

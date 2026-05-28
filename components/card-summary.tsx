@@ -1,8 +1,7 @@
 'use client'
 
-import { Card } from '@prisma/client'
-import { CreditCard, Calendar, TrendingUp } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { CreditCard, Calendar } from 'lucide-react'
+import { formatCurrency, formatDateOnly, isPastDateOnly } from '@/lib/utils'
 
 interface CardSummaryProps {
   card: any
@@ -15,6 +14,8 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
   const remainingValue = totalMaxValue - totalUsed
   const netCost = card.annualFee - totalUsed
   const coveragePercent = card.annualFee > 0 ? (totalUsed / card.annualFee) * 100 : 0
+  const renewalDate = card.userCards?.[0]?.renewalDate
+  const renewalExpired = renewalDate ? isPastDateOnly(renewalDate) : false
 
   return (
     <div
@@ -29,10 +30,10 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
             <p className="text-sm text-zinc-400">{card.issuer}</p>
           </div>
         </div>
-        {card.userCards?.[0]?.renewalDate && (
-          <div className="flex items-center text-sm text-zinc-500">
+        {renewalDate && (
+          <div className={`flex items-center text-sm ${renewalExpired ? 'text-red-400' : 'text-zinc-500'}`}>
             <Calendar className="h-4 w-4 mr-1" />
-            <span>Renews {formatDate(card.userCards[0].renewalDate)}</span>
+            <span>{renewalExpired ? 'Expired' : 'Renews'} {formatDateOnly(renewalDate)}</span>
           </div>
         )}
       </div>

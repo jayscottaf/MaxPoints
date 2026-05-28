@@ -195,7 +195,7 @@ async function main() {
     data: {
       userId: user.id,
       cardId: amexPlatinum.id,
-      renewalDate: new Date('2025-10-20')
+      renewalDate: new Date('2026-10-20')
     }
   })
 
@@ -203,7 +203,7 @@ async function main() {
     data: {
       userId: user.id,
       cardId: amexHiltonAspire.id,
-      renewalDate: new Date('2025-11-22')
+      renewalDate: new Date('2026-11-22')
     }
   })
 
@@ -211,7 +211,7 @@ async function main() {
     data: {
       userId: user.id,
       cardId: chaseReserve.id,
-      renewalDate: new Date('2025-01-01')
+      renewalDate: new Date('2027-01-01')
     }
   })
 
