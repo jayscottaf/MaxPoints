@@ -42,6 +42,15 @@ export function formatDateOnly(date: Date | string): string {
   return format(new Date(year, month, day), 'MMM d, yyyy')
 }
 
+export function daysUntilDateOnly(date: Date | string): number {
+  const { year, month, day } = getDateOnlyParts(date)
+  const today = new Date()
+  const targetDay = new Date(year, month, day)
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+  return differenceInDays(targetDay, todayOnly)
+}
+
 export function formatExpirationMonth(date: Date | string): string {
   const { year, month } = getDateOnlyParts(date)
   return `${String(month + 1).padStart(2, '0')}/${String(year).slice(-2)}`

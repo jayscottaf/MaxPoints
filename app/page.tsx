@@ -4,20 +4,83 @@ import { useEffect, useState } from 'react'
 import { CardSummary } from '@/components/card-summary'
 import { CardSettingsModal } from '@/components/card-settings-modal'
 import { PerkItem } from '@/components/perk-item'
-import { formatCurrency } from '@/lib/utils'
-import { CreditCard, TrendingUp, Calendar, Bell, X } from 'lucide-react'
+import { daysUntilDateOnly, formatCurrency, formatDateOnly } from '@/lib/utils'
+import { CreditCard, TrendingUp, Calendar, Bell, X, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
+
+const DUE_PERKS_COLLAPSED_COUNT = 6
+
+function getUpcomingUnusedPerks(perks: any[]) {
+  return perks
+    .map((perk) => ({
+      ...perk,
+      daysLeft: perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null,
+    }))
+    .filter((perk) =>
+      perk.maxValue > 0 &&
+      (perk.currentUsage || 0) === 0 &&
+      perk.periodEnd &&
+      perk.daysLeft !== null &&
+      perk.daysLeft >= 0
+    )
+    .sort((a, b) => {
+      if (a.daysLeft !== b.daysLeft) {
+        return a.daysLeft - b.daysLeft
+      }
+
+      const cardCompare = (a.card?.name || '').localeCompare(b.card?.name || '')
+      if (cardCompare !== 0) {
+        return cardCompare
+      }
+
+      return a.name.localeCompare(b.name)
+    })
+}
+
+function getDueUrgency(daysLeft: number) {
+  if (daysLeft === 0) {
+    return {
+      badge: 'bg-red-900/60 text-red-200 border-red-700/60',
+      accent: 'border-l-red-500',
+      label: 'Due today',
+    }
+  }
+
+  if (daysLeft <= 14) {
+    return {
+      badge: 'bg-orange-900/50 text-orange-200 border-orange-700/60',
+      accent: 'border-l-orange-500',
+      label: `${daysLeft} days left`,
+    }
+  }
+
+  if (daysLeft <= 30) {
+    return {
+      badge: 'bg-yellow-900/50 text-yellow-200 border-yellow-700/60',
+      accent: 'border-l-yellow-500',
+      label: `${daysLeft} days left`,
+    }
+  }
+
+  return {
+    badge: 'bg-blue-900/40 text-blue-200 border-blue-700/50',
+    accent: 'border-l-blue-500',
+    label: `${daysLeft} days left`,
+  }
+}
 
 export default function Dashboard() {
   const [cards, setCards] = useState<any[]>([])
   const [selectedCard, setSelectedCard] = useState<any>(null)
   const [perks, setPerks] = useState<any[]>([])
+  const [allPerks, setAllPerks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showPerkModal, setShowPerkModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showAllDuePerks, setShowAllDuePerks] = useState(false)
 
   useEffect(() => {
-    fetchCards()
+    fetchDashboardData()
   }, [])
 
   useEffect(() => {
@@ -26,15 +89,32 @@ export default function Dashboard() {
     }
   }, [selectedCard])
 
+  const fetchDashboardData = async () => {
+    try {
+      const [cardsResponse, perksResponse] = await Promise.all([
+        fetch('/api/cards'),
+        fetch('/api/perks'),
+      ])
+      const [cardsData, perksData] = await Promise.all([
+        cardsResponse.json(),
+        perksResponse.json(),
+      ])
+      setCards(cardsData)
+      setAllPerks(perksData)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+      setLoading(false)
+    }
+  }
+
   const fetchCards = async () => {
     try {
       const response = await fetch('/api/cards')
       const data = await response.json()
       setCards(data)
-      setLoading(false)
     } catch (error) {
       console.error('Failed to fetch cards:', error)
-      setLoading(false)
     }
   }
 
@@ -57,6 +137,13 @@ export default function Dashboard() {
           : perk
       )
     )
+    setAllPerks(prevPerks =>
+      prevPerks.map(perk =>
+        perk.id === perkId
+          ? { ...perk, currentUsage: (perk.currentUsage || 0) + amount }
+          : perk
+      )
+    )
     fetchCards()
   }
 
@@ -70,6 +157,10 @@ export default function Dashboard() {
     0
   )
   const netCost = totalAnnualFees - totalUsed
+  const upcomingUnusedPerks = getUpcomingUnusedPerks(allPerks)
+  const visibleDuePerks = showAllDuePerks
+    ? upcomingUnusedPerks
+    : upcomingUnusedPerks.slice(0, DUE_PERKS_COLLAPSED_COUNT)
 
   if (loading) {
     return (
@@ -151,6 +242,72 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <section className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Unused Perks Coming Due</h2>
+              <p className="text-sm text-zinc-400 mt-1">
+                Unused credits and one-time perks sorted by the next expiration date.
+              </p>
+            </div>
+            {upcomingUnusedPerks.length > DUE_PERKS_COLLAPSED_COUNT && (
+              <button
+                onClick={() => setShowAllDuePerks((value) => !value)}
+                className="self-start sm:self-auto px-3 py-2 text-sm rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+              >
+                {showAllDuePerks ? 'Show less' : `Show all ${upcomingUnusedPerks.length}`}
+              </button>
+            )}
+          </div>
+
+          {upcomingUnusedPerks.length === 0 ? (
+            <div className="border border-zinc-800 rounded-lg bg-[#1a1b23] p-6 flex items-center gap-3 text-zinc-300">
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              <span>No unused perks with upcoming due dates right now.</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {visibleDuePerks.map((perk) => {
+                const urgency = getDueUrgency(perk.daysLeft)
+
+                return (
+                  <button
+                    key={perk.id}
+                    onClick={() => setSelectedCard(perk.card)}
+                    className={`text-left bg-[#1a1b23] border border-zinc-800 border-l-4 ${urgency.accent} rounded-lg p-4 hover:border-zinc-600 transition-colors`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${urgency.badge}`}>
+                            {perk.daysLeft <= 30 && <AlertTriangle className="h-3 w-3" />}
+                            {urgency.label}
+                          </span>
+                          {perk.periodType === 'one-time' && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-purple-900/50 text-purple-200 border border-purple-700/50">
+                              one-time
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-zinc-400">{perk.card?.name}</p>
+                        <h3 className="font-semibold text-white truncate">{perk.name}</h3>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-bold text-blue-300">{formatCurrency(perk.maxValue)}</p>
+                        <p className="text-xs text-zinc-500">unused</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
+                      <Calendar className="h-4 w-4 text-zinc-500" />
+                      <span>Due {formatDateOnly(perk.periodEnd)}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </section>
 
         {/* Cards Grid */}
         <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>

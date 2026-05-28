@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPeriodDates } from '@/lib/utils'
+
+function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; periodType: string }) {
+  if (perk.startDate && perk.endDate) {
+    return { start: new Date(perk.startDate), end: new Date(perk.endDate) }
+  }
+
+  return getPeriodDates(perk.periodType)
+}
 
 export async function GET() {
   try {
@@ -18,11 +27,18 @@ export async function GET() {
       }
     })
 
-    // Attach currentUsage to each perk
+    // Attach current-period usage to each perk so dashboard totals match the perk modal.
     const cardsWithUsage = cards.map(card => ({
       ...card,
       perks: card.perks.map(perk => {
-        const currentUsage = perk.usage.reduce((sum, u) => sum + u.amount, 0)
+        const periodRange = getPeriodRange(perk)
+        const currentUsage = perk.usage
+          .filter((usage) => {
+            const usageDate = new Date(usage.date)
+            return usageDate >= periodRange.start && usageDate <= periodRange.end
+          })
+          .reduce((sum, usage) => sum + usage.amount, 0)
+
         return { ...perk, currentUsage }
       })
     }))
