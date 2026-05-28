@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPeriodDates } from '@/lib/utils'
+
+function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; periodType: string }) {
+  if (perk.startDate && perk.endDate) {
+    return { start: new Date(perk.startDate), end: new Date(perk.endDate) }
+  }
+
+  return getPeriodDates(perk.periodType)
+}
+
+function getUsageDateForPeriod(periodRange: { start: Date; end: Date }) {
+  const now = new Date()
+
+  if (now < periodRange.start) {
+    return periodRange.start
+  }
+
+  if (now > periodRange.end) {
+    return periodRange.end
+  }
+
+  return now
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +64,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { perkId, amount, notes } = body
+    const usageAmount = Number(amount)
+
+    if (!perkId || !Number.isFinite(usageAmount) || usageAmount <= 0) {
+      return NextResponse.json({ error: 'Valid perk and amount are required' }, { status: 400 })
+    }
 
     // Resolve the default user
     const user = await prisma.user.findFirst()
@@ -63,13 +91,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Perk not found' }, { status: 404 })
     }
 
-    const currentUsage = perk.usage.reduce((sum, u) => sum + u.amount, 0)
-    if (currentUsage + amount > perk.maxValue) {
+    const periodRange = getPeriodRange(perk)
+    const currentUsage = perk.usage
+      .filter((usage) => {
+        const usageDate = new Date(usage.date)
+        return usageDate >= periodRange.start && usageDate <= periodRange.end
+      })
+      .reduce((sum, usage) => sum + usage.amount, 0)
+
+    if (currentUsage + usageAmount > perk.maxValue) {
       return NextResponse.json({
         error: 'Usage would exceed maximum value',
         currentUsage,
         maxValue: perk.maxValue,
-        attemptedAmount: amount
+        attemptedAmount: usageAmount
       }, { status: 400 })
     }
 
@@ -77,7 +112,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         perkId,
-        amount,
+        amount: usageAmount,
+        date: getUsageDateForPeriod(periodRange),
         notes
       },
       include: {
