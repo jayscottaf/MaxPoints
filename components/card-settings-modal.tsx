@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CreditCard, Save, X } from 'lucide-react'
+import { CreditCard, Save } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 type CardSettingsValues = {
   expirationMonth: string
@@ -133,20 +134,9 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-[#1a1b23] border border-zinc-800 rounded-lg max-w-3xl w-full max-h-[85vh] overflow-hidden">
-        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Card Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
-            aria-label="Close card settings"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[calc(85vh-96px)] space-y-4">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent title="Card Settings" onClose={onClose} className="max-w-3xl">
+        <div className="space-y-4">
           {cards.map((card) => {
             const userCard = card.userCards?.[0]
             if (!userCard) {
@@ -216,7 +206,7 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
             )
           })}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

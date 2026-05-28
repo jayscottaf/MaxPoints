@@ -1,7 +1,7 @@
 'use client'
 
 import { CreditCard, Calendar } from 'lucide-react'
-import { formatCurrency, formatExpirationMonth, isPastDateOnly } from '@/lib/utils'
+import { formatCurrency, formatExpirationMonth, getCardBrand, isPastDateOnly } from '@/lib/utils'
 
 interface CardSummaryProps {
   card: any
@@ -17,32 +17,39 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
   const expirationDate = card.userCards?.[0]?.renewalDate
   const last4 = card.userCards?.[0]?.last4
   const cardExpired = expirationDate ? isPastDateOnly(expirationDate) : false
+  const brand = getCardBrand(card)
 
   return (
-    <div
-      className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6 cursor-pointer hover:border-zinc-600 transition-colors"
+    <button
+      type="button"
+      className="group relative w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#1a1b23] p-6 text-left shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-600 hover:shadow-xl hover:shadow-black/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       onClick={() => onSelect(card)}
     >
-      <div className="flex items-center justify-between mb-4">
+      {/* Brand accent stripe */}
+      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${brand.gradient}`} />
+
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <CreditCard className="h-8 w-8 text-blue-500" />
+          <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${brand.chipBg}`}>
+            <CreditCard className={`h-6 w-6 ${brand.accent}`} />
+          </div>
           <div>
             <h3 className="text-lg font-semibold text-white">{card.name}</h3>
             <p className="text-sm text-zinc-400">{card.issuer}</p>
-            {last4 && (
-              <p className="text-xs text-zinc-500 mt-1">Card ending {last4}</p>
-            )}
+            {last4 && <p className="mt-1 text-xs text-zinc-400">Card ending {last4}</p>}
           </div>
         </div>
         {expirationDate && (
-          <div className={`flex items-center text-sm ${cardExpired ? 'text-red-400' : 'text-zinc-500'}`}>
-            <Calendar className="h-4 w-4 mr-1" />
-            <span>{cardExpired ? 'Expired' : 'Expires'} {formatExpirationMonth(expirationDate)}</span>
+          <div className={`flex items-center text-sm ${cardExpired ? 'text-red-400' : 'text-zinc-400'}`}>
+            <Calendar className="mr-1 h-4 w-4" />
+            <span>
+              {cardExpired ? 'Expired' : 'Expires'} {formatExpirationMonth(expirationDate)}
+            </span>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="mb-4 grid grid-cols-2 gap-4">
         <div>
           <p className="text-sm text-zinc-400">Annual Fee</p>
           <p className="text-xl font-bold text-white">{formatCurrency(card.annualFee)}</p>
@@ -71,11 +78,11 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
       </div>
 
       <div className="mt-4">
-        <div className="flex justify-between text-sm mb-1">
+        <div className="mb-1 flex justify-between text-sm">
           <span className="text-zinc-400">Fee Coverage</span>
           <span className="font-medium text-zinc-200">{coveragePercent.toFixed(0)}%</span>
         </div>
-        <div className="w-full bg-zinc-800 rounded-full h-2">
+        <div className="h-2 w-full rounded-full bg-zinc-800">
           <div
             className={`h-2 rounded-full transition-all ${
               coveragePercent >= 100 ? 'bg-emerald-500' : 'bg-blue-500'
@@ -84,6 +91,6 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
           />
         </div>
       </div>
-    </div>
+    </button>
   )
 }

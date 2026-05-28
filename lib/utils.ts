@@ -117,6 +117,48 @@ export function shouldNotifyForPerk(perk: any, usage: number, reminderDays: numb
   return reminderDays.includes(daysRemaining)
 }
 
+export interface CardBrand {
+  /** Tailwind gradient classes for the accent stripe / icon chip */
+  gradient: string
+  /** Solid accent used for borders / icon tint */
+  accent: string
+  /** Soft tinted background for the icon chip */
+  chipBg: string
+}
+
+const DEFAULT_BRAND: CardBrand = {
+  gradient: 'from-blue-500 to-indigo-500',
+  accent: 'text-blue-400',
+  chipBg: 'bg-blue-500/15',
+}
+
+/**
+ * Map a card to its issuer/product brand colors so each tile is
+ * recognizable at a glance instead of an identical gray box.
+ */
+export function getCardBrand(card: { name?: string; issuer?: string }): CardBrand {
+  const name = (card?.name || '').toLowerCase()
+  const issuer = (card?.issuer || '').toLowerCase()
+
+  if (name.includes('platinum')) {
+    return { gradient: 'from-zinc-300 to-zinc-500', accent: 'text-zinc-200', chipBg: 'bg-zinc-400/15' }
+  }
+  if (name.includes('hilton') || name.includes('aspire')) {
+    return { gradient: 'from-amber-400 to-yellow-600', accent: 'text-amber-300', chipBg: 'bg-amber-500/15' }
+  }
+  if (name.includes('sapphire') || name.includes('reserve')) {
+    return { gradient: 'from-blue-600 to-cyan-500', accent: 'text-blue-300', chipBg: 'bg-blue-500/15' }
+  }
+  if (issuer.includes('american express') || issuer.includes('amex')) {
+    return { gradient: 'from-sky-500 to-blue-700', accent: 'text-sky-300', chipBg: 'bg-sky-500/15' }
+  }
+  if (issuer.includes('chase')) {
+    return { gradient: 'from-blue-600 to-indigo-700', accent: 'text-blue-300', chipBg: 'bg-blue-500/15' }
+  }
+
+  return DEFAULT_BRAND
+}
+
 export function getPerkStatus(perk: any, usage: number): string {
   const percentUsed = getPercentageUsed(usage, perk.maxValue)
 

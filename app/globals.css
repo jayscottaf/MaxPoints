@@ -8,12 +8,60 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dialog (Radix) enter/exit transitions */
+@keyframes dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-content-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.dialog-overlay[data-state='open'] {
+  animation: dialog-overlay-in 150ms ease-out;
+}
+
+.dialog-content[data-state='open'] {
+  animation: dialog-content-in 180ms ease-out;
+}
+
+/* Skeleton loading shimmer */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  background-color: #23252f;
+  border-radius: 0.5rem;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }

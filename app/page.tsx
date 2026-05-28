@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react'
 import { CardSummary } from '@/components/card-summary'
 import { CardSettingsModal } from '@/components/card-settings-modal'
 import { PerkItem } from '@/components/perk-item'
+import { SummaryOverview } from '@/components/summary-overview'
+import { DashboardSkeleton } from '@/components/dashboard-skeleton'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { daysUntilDateOnly, formatCurrency, formatDateOnly } from '@/lib/utils'
-import { CreditCard, TrendingUp, Calendar, Bell, X, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { CreditCard, Calendar, Bell, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 
 const DUE_PERKS_COLLAPSED_COUNT = 6
@@ -174,16 +177,36 @@ export default function Dashboard() {
     (sum, card) => sum + (card.perks?.reduce((s: number, p: any) => s + (p.currentUsage || 0), 0) || 0),
     0
   )
-  const netCost = totalAnnualFees - totalUsed
   const upcomingUnusedPerks = getUpcomingUnusedPerks(allPerks)
   const visibleDuePerks = showAllDuePerks
     ? upcomingUnusedPerks
     : upcomingUnusedPerks.slice(0, DUE_PERKS_COLLAPSED_COUNT)
 
+  const header = (
+    <header className="bg-[#1a1b23] border-b border-zinc-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <CreditCard className="h-8 w-8 text-blue-500" />
+            <h1 className="text-2xl font-bold text-white">MaxPoints</h1>
+          </div>
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          >
+            <Bell className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+        </div>
+      </div>
+    </header>
+  )
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
-        <div className="text-lg text-zinc-300">Loading...</div>
+      <div className="min-h-screen bg-[#0f1117]">
+        {header}
+        <DashboardSkeleton />
       </div>
     )
   }
@@ -192,74 +215,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#0f1117]">
       <Toaster position="top-right" />
 
-      {/* Header */}
-      <header className="bg-[#1a1b23] border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <CreditCard className="h-8 w-8 text-blue-500" />
-              <h1 className="text-2xl font-bold text-white">MaxPoints</h1>
-            </div>
-            <button
-              onClick={() => setShowSettingsModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Bell className="h-5 w-5" />
-              <span>Settings</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      {header}
 
       {/* Summary Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-zinc-400">Total Annual Fees</p>
-                <p className="text-2xl font-bold mt-1 text-white">{formatCurrency(totalAnnualFees)}</p>
-              </div>
-              <CreditCard className="h-8 w-8 text-zinc-600" />
-            </div>
-          </div>
-
-          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-zinc-400">Total Perks Value</p>
-                <p className="text-2xl font-bold mt-1 text-blue-400">{formatCurrency(totalPerksValue)}</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-zinc-400">Used to Date</p>
-                <p className="text-2xl font-bold mt-1 text-emerald-400">{formatCurrency(totalUsed)}</p>
-              </div>
-              <Calendar className="h-8 w-8 text-emerald-500" />
-            </div>
-          </div>
-
-          <div className="bg-[#1a1b23] rounded-lg border border-zinc-800 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-zinc-400">Net Cost</p>
-                <p className={`text-2xl font-bold mt-1 ${netCost <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatCurrency(netCost)}
-                </p>
-              </div>
-              <div className={`h-8 w-8 rounded-full ${netCost <= 0 ? 'bg-emerald-900/50' : 'bg-red-900/50'} flex items-center justify-center`}>
-                <span className={`text-sm font-bold ${netCost <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {netCost <= 0 ? '+' : '-'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SummaryOverview
+          totalAnnualFees={totalAnnualFees}
+          totalPerksValue={totalPerksValue}
+          totalUsed={totalUsed}
+        />
 
         {/* Cards Grid */}
         <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>
@@ -316,7 +280,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-lg font-bold text-blue-300">{formatCurrency(perk.maxValue)}</p>
-                        <p className="text-xs text-zinc-500">unused</p>
+                        <p className="text-xs text-zinc-400">unused</p>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
@@ -332,32 +296,22 @@ export default function Dashboard() {
       </div>
 
       {/* Perks Modal */}
-      {showPerkModal && selectedCard && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1a1b23] border border-zinc-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">{selectedCard.name} Perks</h2>
-              <button
-                onClick={() => setShowPerkModal(false)}
-                className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      <Dialog open={showPerkModal && !!selectedCard} onOpenChange={(open) => !open && setShowPerkModal(false)}>
+        {selectedCard && (
+          <DialogContent
+            title={`${selectedCard.name} Perks`}
+            description={selectedCard.issuer}
+            onClose={() => setShowPerkModal(false)}
+            className="max-w-4xl"
+          >
+            <div className="grid grid-cols-1 gap-4">
+              {perks.map((perk) => (
+                <PerkItem key={perk.id} perk={perk} onUsageUpdate={handleUsageUpdate} />
+              ))}
             </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-              <div className="grid grid-cols-1 gap-4">
-                {perks.map(perk => (
-                  <PerkItem
-                    key={perk.id}
-                    perk={perk}
-                    onUsageUpdate={handleUsageUpdate}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
 
       {showSettingsModal && (
         <CardSettingsModal
