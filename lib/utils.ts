@@ -42,6 +42,11 @@ export function formatDateOnly(date: Date | string): string {
   return format(new Date(year, month, day), 'MMM d, yyyy')
 }
 
+export function formatExpirationMonth(date: Date | string): string {
+  const { year, month } = getDateOnlyParts(date)
+  return `${String(month + 1).padStart(2, '0')}/${String(year).slice(-2)}`
+}
+
 export function isPastDateOnly(date: Date | string): boolean {
   const { year, month, day } = getDateOnlyParts(date)
   const today = new Date()

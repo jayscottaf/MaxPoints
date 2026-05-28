@@ -1,7 +1,7 @@
 'use client'
 
 import { CreditCard, Calendar } from 'lucide-react'
-import { formatCurrency, formatDateOnly, isPastDateOnly } from '@/lib/utils'
+import { formatCurrency, formatExpirationMonth, isPastDateOnly } from '@/lib/utils'
 
 interface CardSummaryProps {
   card: any
@@ -14,9 +14,9 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
   const remainingValue = totalMaxValue - totalUsed
   const netCost = card.annualFee - totalUsed
   const coveragePercent = card.annualFee > 0 ? (totalUsed / card.annualFee) * 100 : 0
-  const renewalDate = card.userCards?.[0]?.renewalDate
+  const expirationDate = card.userCards?.[0]?.renewalDate
   const last4 = card.userCards?.[0]?.last4
-  const renewalExpired = renewalDate ? isPastDateOnly(renewalDate) : false
+  const cardExpired = expirationDate ? isPastDateOnly(expirationDate) : false
 
   return (
     <div
@@ -34,10 +34,10 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
             )}
           </div>
         </div>
-        {renewalDate && (
-          <div className={`flex items-center text-sm ${renewalExpired ? 'text-red-400' : 'text-zinc-500'}`}>
+        {expirationDate && (
+          <div className={`flex items-center text-sm ${cardExpired ? 'text-red-400' : 'text-zinc-500'}`}>
             <Calendar className="h-4 w-4 mr-1" />
-            <span>{renewalExpired ? 'Expired' : 'Renews'} {formatDateOnly(renewalDate)}</span>
+            <span>{cardExpired ? 'Expired' : 'Expires'} {formatExpirationMonth(expirationDate)}</span>
           </div>
         )}
       </div>

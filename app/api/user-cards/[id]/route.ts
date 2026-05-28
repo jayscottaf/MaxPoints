@@ -1,16 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-function parseRenewalDate(value: unknown) {
+function lastDayOfExpirationMonth(value: string) {
+  const [yearValue, monthValue] = value.split('-')
+  const year = Number(yearValue)
+  const month = Number(monthValue)
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('Expiration month must use YYYY-MM format')
+  }
+
+  return new Date(Date.UTC(year, month, 0))
+}
+
+function parseCardExpirationDate(value: unknown) {
   if (value === null || value === '') {
     return null
   }
 
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error('Renewal date must use YYYY-MM-DD format')
+  if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
+    return lastDayOfExpirationMonth(value)
   }
 
-  return new Date(`${value}T00:00:00.000Z`)
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('Expiration month must use YYYY-MM format')
+  }
+
+  return lastDayOfExpirationMonth(value.slice(0, 7))
 }
 
 function parseLast4(value: unknown) {
@@ -36,7 +52,7 @@ export async function PATCH(
     const userCard = await prisma.userCard.update({
       where: { id },
       data: {
-        renewalDate: parseRenewalDate(body.renewalDate),
+        renewalDate: parseCardExpirationDate(body.expirationMonth ?? body.renewalDate),
         last4: parseLast4(body.last4),
       },
       include: {
