@@ -13,15 +13,17 @@ interface PerkItemProps {
 export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const [isLogging, setIsLogging] = useState(false)
   const [amount, setAmount] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const currentUsage = perk.currentUsage || 0
   const percentUsed = getPercentageUsed(currentUsage, perk.maxValue)
   const status = getPerkStatus(perk, currentUsage)
   const daysRemaining = perk.periodEnd ? daysUntil(perk.periodEnd) : null
+  const remainingValue = perk.maxValue - currentUsage
 
-  const handleLogUsage = async () => {
-    const usageAmount = parseFloat(amount)
-    if (!usageAmount || usageAmount <= 0) {
+  // Core submit shared by the one-tap "Used it" button and the manual entry.
+  const submitUsage = async (usageAmount: number) => {
+    if (!Number.isFinite(usageAmount) || usageAmount <= 0) {
       toast.error('Please enter a valid amount')
       return
     }
@@ -31,6 +33,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       return
     }
 
+    setIsSaving(true)
     try {
       const response = await fetch('/api/usage', {
         method: 'POST',
@@ -42,7 +45,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       })
 
       if (response.ok) {
-        toast.success('Usage logged successfully')
+        toast.success('Usage logged')
         onUsageUpdate(perk.id, usageAmount)
         setAmount('')
         setIsLogging(false)
@@ -52,8 +55,13 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       }
     } catch (error) {
       toast.error('Failed to log usage')
+    } finally {
+      setIsSaving(false)
     }
   }
+
+  const handleLogUsage = () => submitUsage(parseFloat(amount))
+  const handleMarkFullyUsed = () => submitUsage(remainingValue)
 
   const getStatusIcon = () => {
     switch (status) {
@@ -138,37 +146,53 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         {status !== 'completed' && (
           <div>
             {!isLogging ? (
-              <button
-                onClick={() => setIsLogging(true)}
-                className="flex items-center space-x-1 text-sm text-blue-400 hover:text-blue-300"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Log Usage</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* One-tap: most credits are all-or-nothing, so log the full remainder. */}
+                <button
+                  onClick={handleMarkFullyUsed}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Used it{remainingValue > 0 ? ` (${formatCurrency(remainingValue)})` : ''}</span>
+                </button>
+                <button
+                  onClick={() => setIsLogging(true)}
+                  disabled={isSaving}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-60"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Log partial</span>
+                </button>
+              </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !isSaving && handleLogUsage()}
                   placeholder="Amount"
+                  autoFocus
                   className="px-2 py-1 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   step="0.01"
                   min="0"
-                  max={perk.maxValue - currentUsage}
+                  max={remainingValue}
                 />
                 <button
                   onClick={handleLogUsage}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  disabled={isSaving}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Save
+                  {isSaving ? 'Saving…' : 'Save'}
                 </button>
                 <button
                   onClick={() => {
                     setIsLogging(false)
                     setAmount('')
                   }}
-                  className="px-3 py-1 text-sm text-zinc-400 hover:text-zinc-200"
+                  disabled={isSaving}
+                  className="px-3 py-1 text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-60"
                 >
                   Cancel
                 </button>
