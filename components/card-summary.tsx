@@ -15,6 +15,7 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
   const netCost = card.annualFee - totalUsed
   const coveragePercent = card.annualFee > 0 ? (totalUsed / card.annualFee) * 100 : 0
   const renewalDate = card.userCards?.[0]?.renewalDate
+  const last4 = card.userCards?.[0]?.last4
   const renewalExpired = renewalDate ? isPastDateOnly(renewalDate) : false
 
   return (
@@ -28,6 +29,9 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
           <div>
             <h3 className="text-lg font-semibold text-white">{card.name}</h3>
             <p className="text-sm text-zinc-400">{card.issuer}</p>
+            {last4 && (
+              <p className="text-xs text-zinc-500 mt-1">Card ending {last4}</p>
+            )}
           </div>
         </div>
         {renewalDate && (

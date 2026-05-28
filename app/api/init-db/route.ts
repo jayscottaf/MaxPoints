@@ -41,11 +41,16 @@ export async function GET() {
         "userId" TEXT NOT NULL,
         "cardId" TEXT NOT NULL,
         "renewalDate" TIMESTAMP(3),
+        "last4" TEXT,
         "isActive" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT "UserCard_pkey" PRIMARY KEY ("id")
       );
+    `)
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "UserCard" ADD COLUMN IF NOT EXISTS "last4" TEXT;
     `)
 
     await prisma.$executeRawUnsafe(`

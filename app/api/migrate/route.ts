@@ -56,6 +56,7 @@ export async function GET() {
         "userId" TEXT NOT NULL,
         "cardId" TEXT NOT NULL,
         "renewalDate" TIMESTAMP(3),
+        "last4" TEXT,
         "isActive" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

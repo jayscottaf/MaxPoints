@@ -47,6 +47,7 @@ export async function GET() {
         "userId" TEXT NOT NULL,
         "cardId" TEXT NOT NULL,
         "renewalDate" TIMESTAMP(3),
+        "last4" TEXT,
         "isActive" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +55,10 @@ export async function GET() {
         CONSTRAINT "UserCard_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
         CONSTRAINT "UserCard_cardId_fkey" FOREIGN KEY ("cardId") REFERENCES "Card"("id") ON DELETE RESTRICT ON UPDATE CASCADE
       );
+    `)
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "UserCard" ADD COLUMN IF NOT EXISTS "last4" TEXT;
     `)
 
     await prisma.$executeRawUnsafe(`

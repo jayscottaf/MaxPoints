@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CardSummary } from '@/components/card-summary'
+import { CardSettingsModal } from '@/components/card-settings-modal'
 import { PerkItem } from '@/components/perk-item'
 import { formatCurrency } from '@/lib/utils'
 import { CreditCard, TrendingUp, Calendar, Bell, X } from 'lucide-react'
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [perks, setPerks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showPerkModal, setShowPerkModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   useEffect(() => {
     fetchCards()
@@ -89,7 +91,10 @@ export default function Dashboard() {
               <CreditCard className="h-8 w-8 text-blue-500" />
               <h1 className="text-2xl font-bold text-white">MaxPoints</h1>
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
               <Bell className="h-5 w-5" />
               <span>Settings</span>
             </button>
@@ -182,6 +187,14 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {showSettingsModal && (
+        <CardSettingsModal
+          cards={cards}
+          onClose={() => setShowSettingsModal(false)}
+          onSaved={fetchCards}
+        />
       )}
     </div>
   )
