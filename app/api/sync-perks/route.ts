@@ -16,9 +16,13 @@ type NewPerk = {
 }
 
 // Perks to delete (matched by exact name within the card).
-const REMOVALS: Record<string, string[]> = {
-  'amex-platinum': ['Saks Fifth Avenue Credit H1', 'Saks Fifth Avenue Credit H2'],
-}
+//
+// NOTE: The retired Saks Fifth Avenue credit is intentionally NOT removed here.
+// Deleting a perk also deletes its Usage rows (no cascade in the schema, so we
+// delete them explicitly), which would erase real usage history. Saks ended
+// 6/30/2026 but any usage already logged against it should stay visible, so we
+// leave the existing perk + usage in place. Fresh seeds simply omit Saks.
+const REMOVALS: Record<string, string[]> = {}
 
 // Perks whose value/description changed (matched by exact name within the card).
 const UPDATES: Record<string, Array<{ name: string; data: { maxValue?: number; description?: string } }>> = {
