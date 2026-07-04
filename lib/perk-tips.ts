@@ -1,34 +1,37 @@
-// Curated "how to actually use this" tips, sourced once from The Points Guy,
-// Doctor of Credit, NerdWallet, Frequent Miler, and r/churning best-practice
-// guides (July 2026). Static by design — no live scraping/LLM calls per email.
-// Refresh periodically alongside the benefit data in prisma/seed.ts.
+// Curated "how to actually use this" tips. Amex Platinum and Chase Sapphire
+// Reserve tips are verified against live official card-benefit pages
+// (chase.com, americanexpress.com) plus The Points Guy/NerdWallet/Doctor of
+// Credit/Upgraded Points (July 2026). Hilton Aspire tips are sourced from
+// those trackers but not individually re-verified against Amex's own pages.
+// Static by design — no live scraping/LLM calls per email. Refresh
+// periodically alongside the benefit data in prisma/seed.ts.
 
 const TIPS: Record<string, Record<string, string>> = {
   'amex-platinum': {
     'Resy Dining Credit':
-      'Book via the Resy app (not phone) at Amex-partner restaurants; filter "Amex Offers" in-app. Unused balance does not roll over.',
+      'Enroll first in Amex Benefits, then pay at any U.S. Resy-partner restaurant (dine-in or via the Resy app, either works) — gift cards/merchandise excluded. Unused balance does not roll over.',
     'Lululemon Credit':
-      'Pay in-store or on lululemon.com directly with the card. Gift cards bought at Lululemon also trigger the credit.',
+      "Pay in-store or on lululemon.com directly with the card. Gift cards are officially excluded from triggering the credit — don't rely on them.",
     'Hotel Credit (FHR/THC)':
       "Book only through Amex Travel's FHR/THC portal (not directly with the hotel) to get the credit plus room upgrades.",
     'Digital Entertainment Credit':
-      'Enroll the specific streaming service (Disney+, Hulu, ESPN+, NYT, Peacock, Audible) in the Amex Offers portal first — auto-pay without enrolling will not trigger it.',
+      'Enroll in Amex Benefits first, wait ~24 hrs, then charge Disney+, Hulu, ESPN, Paramount+, Peacock, NYT, WSJ, or YouTube Premium/TV directly.',
     'Uber Cash':
-      'Add the card in the Uber app as your Amex Platinum specifically so it auto-loads monthly; also works for Uber Eats.',
+      'Add the card to your Uber/Uber Eats wallet; $15 Uber Cash auto-loads monthly (up to 48 hrs), works for rides and Eats. Toggle Uber Cash on and pay with the Amex.',
     'Uber One Membership':
-      "Enroll via the Uber app's Amex Platinum promo (not a generic Uber One signup) so Amex reimburses the membership fee.",
+      'No special enrollment needed — set the Platinum as payment for Uber One and toggle Uber Cash OFF for the membership charge so Amex bills it directly.',
     'CLEAR Plus Credit':
-      'Enroll at clearme.com/amex or in-app with the Platinum as the payment method — covers your plan plus one authorized user.',
+      'Enroll at clearme.com or an airport CLEAR pod with the Platinum as payment. Credit covers Basic + Additional Card Members, capped per year across the account.',
     'Walmart+ Membership':
-      'Sign up or link your existing membership at walmart.com using the card; the credit applies automatically, no separate enrollment step.',
+      'Enroll in the benefit first, then sign up for the monthly (not annual) Walmart+ plan with the card as payment; the credit applies automatically after that.',
     'Airline Incidental Fee Credit':
       'Pick your airline in the Amex Benefits portal by Jan 31, then only charge incidentals (bags, seat upgrades, lounge passes) — not the ticket itself.',
     'Oura Ring Credit':
       'Buy directly from ouraring.com with the card for an automatic credit; the membership subscription itself does not qualify.',
     'Equinox Credit':
-      'Pay your Equinox club membership or Equinox+ subscription directly with the card — corporate-discounted memberships may not qualify.',
+      'Pay Equinox club or Equinox+ directly with the card via platinum.equinox.com. Day passes and app-based purchases do not count.',
     'SoulCycle At-Home Bike Credit':
-      'Requires an active Equinox+ subscription first, then purchase the bike directly to trigger this one-time $300 credit.',
+      'Requires committing to a 12-month Equinox+ membership, then buy the bike at equinoxplus.com/amexbikebenefit (not in-store/app) to trigger the one-time $300 credit.',
     'Global Entry/TSA PreCheck':
       'Pay the Global Entry fee (not just PreCheck) directly with the card — GE includes PreCheck, so it is the better value for the same credit.',
   },
@@ -56,37 +59,37 @@ const TIPS: Record<string, Record<string, string>> = {
   },
   'chase-reserve': {
     'Annual Travel Credit':
-      'Applies automatically to almost any travel-coded purchase (flights, parking, tolls, transit, Airbnb) — no enrollment or portal needed.',
+      'Applies automatically to almost any travel-coded purchase (flights, hotels, car rentals, trains, taxis, tolls) — no enrollment or booking site required.',
     'The Edit Hotel Credit':
-      "Book 2+ night prepaid stays through Chase Travel's dedicated \"The Edit\" tab specifically — regular Chase Travel bookings do not count.",
+      'Book 2+ night prepaid stays through Chase Travel\'s dedicated "The Edit" section (chasetravel.com/theedit) specifically — regular Chase Travel bookings do not count.',
     '2026 Hotel Credit (One-Time)':
-      'Check the current partner hotel list in the Chase Travel portal before booking — it only applies at select 2026 partner collections.',
+      'Only applies at select brands: IHG, Montage, Pendry, Omni, Virgin, Minor Hotels, Pan Pacific — confirm the current list in the Chase Travel portal before booking.',
     'Dining Credit':
-      "Book through the \"Sapphire Reserve Exclusive Tables\" program inside OpenTable's dedicated CSR portal — regular OpenTable reservations do not trigger it.",
+      'Only counts at restaurants in the "Sapphire Reserve Exclusive Tables" program — link your card via OpenTable and book listed restaurants; regular OpenTable bookings do not qualify.',
     'Entertainment Credit':
-      'Redeemable only on StubHub or viagogo purchases — other ticket vendors will not trigger it.',
+      'Redeemable only on StubHub/viagogo — but you must activate the benefit on chase.com\'s benefits hub first; purchases made before activation do not count.',
     'DoorDash DashPass':
-      'Activate the DashPass offer manually in your Chase account/app once — it does not apply automatically, but recurs after that.',
+      'Link the card as your default DoorDash/Caviar payment method, then activate once — it recurs automatically after that as long as the account stays active.',
     'DoorDash Credits':
-      'It splits into a $5/mo restaurant credit and two separate $10/mo grocery/retail credits that do not roll over — place a small qualifying order each month.',
+      'Splits into a $5/mo restaurant credit and two separate $10/mo grocery/retail credits, one qualifying order each — none roll over if unused.',
     'Lyft Credit':
-      'Link the card as your payment method in the Lyft app so it auto-applies to rides — unused monthly credit does not carry over.',
+      'Link the card as your payment method in the Lyft app so the $10/mo auto-applies to rides — no separate opt-in page, and unused credit does not carry over.',
     'Peloton Credit':
-      'Enroll separately through the Chase benefits portal before it applies to Peloton App or equipment membership charges.',
+      "Activate once via chase.com or the Chase Mobile app's Benefits section before Peloton App or equipment charges qualify; up to $10/mo through 12/31/27.",
     'Apple TV+ & Music':
-      'Activate once via the Chase offers/Apple enrollment link tied to the card; complimentary through June 2027, so re-check enrollment if billed unexpectedly.',
+      "Activate once via the Chase Mobile app's Card Benefits (link your Apple ID); complimentary through 6/22/2027 — enrolling suspends any existing paid Apple subscription.",
     'Global Entry/TSA PreCheck':
       'Pay the application fee directly with this card for an instant credit — works for Global Entry, TSA PreCheck, or NEXUS, once per 4-year cycle.',
     'Priority Pass Select':
-      'Enroll via the Chase-specific Priority Pass link (not a generic signup) for unlimited visits, and add authorized users for companion access.',
+      'Activates automatically on eligible accounts — physical card is mailed and digital card is set up in the Priority Pass or Chase Mobile app. Authorized users get their own membership for companion access.',
     'IHG One Rewards Platinum Elite Status':
-      'Link your IHG account number in the Chase card benefits dashboard — status will not post without linking the account first.',
+      'Link your IHG One Rewards account via chase.com or the Chase Mobile app (enroll at ihg.com first if you don\'t have one) — status is not granted retroactively and can take up to 3 weeks to post.',
     'Marriott Bonvoy Gold Elite Status':
-      'Re-register each card membership year via the Chase benefits portal link — this status does not auto-renew.',
+      'Register during the annual promo window (2026: Jul 1–Sep 30) via marriott.chase.com/elite-status — it does not auto-renew, and award/3rd-party bookings don\'t count toward extending it.',
     'Chase Sapphire Lounge Access':
-      'Tap your physical card at entry to access Chase’s own lounges (separate from Priority Pass) — no app needed, but note capacity caps at busy locations.',
+      'Entry requires your Priority Pass card plus a same-day boarding pass (within 3 hrs of departure), not just a tap — PHX Terminal 4 and LGA Reserve Suites require app reservations at capacity.',
     '$75K Spend-Tier Perks':
-      'Track spend in the Chase app benefits tracker; front-load large annual expenses (rent, taxes) before year-end if you are close to the $75K threshold.',
+      'Spending $75K/year unlocks IHG Diamond, Hyatt Explorist, Southwest A-List, a $500 Southwest credit, and a $250 Shops at Chase credit — no dedicated tracker exists yet, so front-load big expenses if close.',
   },
 }
 
