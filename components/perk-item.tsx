@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Check, Clock, DollarSign, AlertTriangle, Plus } from 'lucide-react'
 import { formatCurrency, daysUntil, getPercentageUsed, getPerkStatus } from '@/lib/utils'
+import { getPerkTip } from '@/lib/perk-tips'
 import { toast } from 'react-hot-toast'
 
 interface PerkItemProps {
@@ -20,6 +21,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const status = getPerkStatus(perk, currentUsage)
   const daysRemaining = perk.periodEnd ? daysUntil(perk.periodEnd) : null
   const remainingValue = perk.maxValue - currentUsage
+  const tip = status !== 'completed' ? getPerkTip(perk.cardId, perk.name) : null
 
   // Core submit shared by the one-tap "Used it" button and the manual entry.
   const submitUsage = async (usageAmount: number) => {
@@ -98,6 +100,9 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             <h4 className="font-medium text-white">{perk.name}</h4>
             {perk.description && (
               <p className="text-sm text-zinc-400 mt-1">{perk.description}</p>
+            )}
+            {tip && (
+              <p className="text-sm text-zinc-500 mt-1">💡 {tip}</p>
             )}
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor()}`}>

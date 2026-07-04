@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, getPeriodDates, getReminderDaysForPeriodType } from '@/lib/utils'
+import { getPerkTip } from '@/lib/perk-tips'
 import { PerkExpirationEmailItem, sendPerkExpirationEmail } from '@/lib/email'
 
 export const runtime = 'nodejs'
@@ -180,6 +181,7 @@ export async function GET(request: NextRequest) {
         daysRemaining,
         periodEnd,
         reminderKey,
+        tip: getPerkTip(userCard.cardId, perk.name),
       })
     }
   }
@@ -197,6 +199,7 @@ export async function GET(request: NextRequest) {
         remainingValue: candidate.remainingValue,
         daysRemaining: candidate.daysRemaining,
         periodEnd: candidate.periodEnd,
+        tip: candidate.tip,
       })),
     })
   }

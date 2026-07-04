@@ -9,6 +9,7 @@ export type PerkExpirationEmailItem = {
   currentUsage: number
   daysRemaining: number
   periodEnd: Date
+  tip: string | null
 }
 
 let resend: Resend | null = null
@@ -39,21 +40,34 @@ function renderRows(items: PerkExpirationEmailItem[]) {
     .map((item) => {
       const daysLabel = item.daysRemaining === 1 ? '1 day' : `${item.daysRemaining} days`
 
+      const tipRow = item.tip
+        ? `
+        <tr>
+          <td colspan="3" style="padding: 0 12px 12px; border-bottom: 1px solid #e5e7eb;">
+            <div style="background: #eff6ff; border-radius: 6px; padding: 8px 10px; color: #1e40af; font-size: 13px;">
+              💡 ${escapeHtml(item.tip)}
+            </div>
+          </td>
+        </tr>
+      `
+        : ''
+
       return `
         <tr>
-          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px; ${item.tip ? '' : 'border-bottom: 1px solid #e5e7eb;'}">
             <strong>${escapeHtml(item.perkName)}</strong>
             <div style="color: #6b7280; font-size: 13px;">${escapeHtml(item.cardName)}</div>
           </td>
-          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; white-space: nowrap;">
+          <td style="padding: 12px; ${item.tip ? '' : 'border-bottom: 1px solid #e5e7eb;'} white-space: nowrap;">
             ${formatCurrency(item.remainingValue)}
             <div style="color: #6b7280; font-size: 13px;">of ${formatCurrency(item.maxValue)}</div>
           </td>
-          <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; white-space: nowrap;">
+          <td style="padding: 12px; ${item.tip ? '' : 'border-bottom: 1px solid #e5e7eb;'} white-space: nowrap;">
             ${formatDate(item.periodEnd)}
             <div style="color: #b45309; font-size: 13px;">${daysLabel} left</div>
           </td>
         </tr>
+        ${tipRow}
       `
     })
     .join('')
@@ -105,9 +119,10 @@ export function renderPerkExpirationEmail(items: PerkExpirationEmailItem[], appU
   const text = [
     'Expiring MaxPoints perks',
     '',
-    ...items.map((item) => {
+    ...items.flatMap((item) => {
       const daysLabel = item.daysRemaining === 1 ? '1 day' : `${item.daysRemaining} days`
-      return `${item.cardName} - ${item.perkName}: ${formatCurrency(item.remainingValue)} unused, expires ${formatDate(item.periodEnd)} (${daysLabel} left)`
+      const line = `${item.cardName} - ${item.perkName}: ${formatCurrency(item.remainingValue)} unused, expires ${formatDate(item.periodEnd)} (${daysLabel} left)`
+      return item.tip ? [line, `  Tip: ${item.tip}`] : [line]
     }),
     '',
     `Open MaxPoints: ${appUrl}`,
