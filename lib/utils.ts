@@ -117,6 +117,33 @@ export function shouldNotifyForPerk(perk: any, usage: number, reminderDays: numb
   return reminderDays.includes(daysRemaining)
 }
 
+// Fallback cadence used when a perk's period type isn't recognized.
+export const DEFAULT_REMINDER_DAYS = [14, 7, 2, 1]
+
+/**
+ * Reminder cadence (days-remaining before the period closes) tuned to each
+ * perk's cycle. Short cycles get tighter nudges so they aren't drowned out;
+ * long cycles get an early heads-up plus end-of-cycle urgency.
+ *
+ * One-time perks have no recurring deadline, so they get no reminders here.
+ */
+export function getReminderDaysForPeriodType(periodType: string): number[] {
+  switch (periodType) {
+    case 'monthly':
+      return [7, 3, 1]
+    case 'quarterly':
+      return [21, 14, 7, 2, 1]
+    case 'semi-annual':
+      return [30, 14, 7, 2]
+    case 'annual':
+      return [60, 30, 14, 7, 2]
+    case 'one-time':
+      return []
+    default:
+      return DEFAULT_REMINDER_DAYS
+  }
+}
+
 export interface CardBrand {
   /** Tailwind gradient classes for the accent stripe / icon chip */
   gradient: string

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, getPeriodDates } from '@/lib/utils'
+import { formatCurrency, getPeriodDates, getReminderDaysForPeriodType } from '@/lib/utils'
 import { PerkExpirationEmailItem, sendPerkExpirationEmail } from '@/lib/email'
 
 export const runtime = 'nodejs'
 
-const DEFAULT_REMINDER_DAYS = [14, 7, 2, 1]
 const DEFAULT_TO_EMAIL = 'jayscotta@gmail.com'
 const DEFAULT_FROM_EMAIL = 'MaxPoints <onboarding@resend.dev>'
 
@@ -17,11 +16,16 @@ type Candidate = PerkExpirationEmailItem & {
   reminderKey: string
 }
 
-function parseReminderDays(request: NextRequest, allowOverride: boolean) {
+/**
+ * Optional `?days=` override (only honored for dryRun/testSend). When set, it
+ * forces this cadence across all perks for testing. Returns null otherwise so
+ * each perk falls back to its period-type-specific cadence.
+ */
+function parseReminderDaysOverride(request: NextRequest, allowOverride: boolean): number[] | null {
   const override = request.nextUrl.searchParams.get('days')
 
   if (!allowOverride || !override) {
-    return DEFAULT_REMINDER_DAYS
+    return null
   }
 
   const parsed = override
@@ -29,7 +33,7 @@ function parseReminderDays(request: NextRequest, allowOverride: boolean) {
     .map((value) => Number(value.trim()))
     .filter((value) => Number.isInteger(value) && value >= 0)
 
-  return parsed.length > 0 ? parsed : DEFAULT_REMINDER_DAYS
+  return parsed.length > 0 ? parsed : null
 }
 
 function getReminderKey(metadata: unknown) {
@@ -75,7 +79,7 @@ export async function GET(request: NextRequest) {
 
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1'
   const testSend = request.nextUrl.searchParams.get('testSend') === '1'
-  const reminderDays = parseReminderDays(request, dryRun || testSend)
+  const reminderDaysOverride = parseReminderDaysOverride(request, dryRun || testSend)
   const today = startOfDay(new Date())
   const userCards = await prisma.userCard.findMany({
     where: { isActive: true },
@@ -132,6 +136,10 @@ export async function GET(request: NextRequest) {
       const periodEnd = new Date(periodRange.end)
       const daysRemaining = differenceInCalendarDays(startOfDay(periodEnd), today)
 
+      // A test override applies one cadence to every perk; otherwise each
+      // perk uses the cadence tuned to its renewal cycle.
+      const reminderDays = reminderDaysOverride ?? getReminderDaysForPeriodType(perk.periodType)
+
       if (!reminderDays.includes(daysRemaining)) {
         continue
       }
@@ -181,7 +189,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       dryRun: true,
       scannedPerks,
-      reminderDays,
+      reminderDaysOverride,
       candidateCount: candidates.length,
       candidates: candidates.map((candidate) => ({
         cardName: candidate.cardName,
