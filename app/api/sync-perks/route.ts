@@ -24,6 +24,13 @@ type NewPerk = {
 // leave the existing perk + usage in place. Fresh seeds simply omit Saks.
 const REMOVALS: Record<string, string[]> = {}
 
+// Perks to remove ONLY if they have no logged usage. Used to hide retired
+// benefits that were never used (e.g. the unused Saks H2 half) without ever
+// risking real usage history — anything with usage rows is left untouched.
+const REMOVE_IF_UNUSED: Record<string, string[]> = {
+  'amex-platinum': ['Saks Fifth Avenue Credit H2'],
+}
+
 // Perks whose value/description changed (matched by exact name within the card).
 const UPDATES: Record<string, Array<{ name: string; data: { maxValue?: number; description?: string } }>> = {
   'amex-hilton-aspire': [
@@ -126,7 +133,13 @@ const ADDITIONS: Record<string, NewPerk[]> = {
 }
 
 export async function GET(_request: NextRequest) {
-  const result = { removed: [] as string[], updated: [] as string[], added: [] as string[], skipped: [] as string[] }
+  const result = {
+    removed: [] as string[],
+    updated: [] as string[],
+    added: [] as string[],
+    skipped: [] as string[],
+    keptWithUsage: [] as string[],
+  }
 
   try {
     // Removals — delete dependent usage rows first (no cascade in schema).
@@ -135,6 +148,22 @@ export async function GET(_request: NextRequest) {
         const perks = await prisma.perk.findMany({ where: { cardId, name } })
         for (const perk of perks) {
           await prisma.usage.deleteMany({ where: { perkId: perk.id } })
+          await prisma.perk.delete({ where: { id: perk.id } })
+          result.removed.push(`${cardId}: ${name}`)
+        }
+      }
+    }
+
+    // Guarded removals — delete only when the perk has no usage rows.
+    for (const [cardId, names] of Object.entries(REMOVE_IF_UNUSED)) {
+      for (const name of names) {
+        const perks = await prisma.perk.findMany({ where: { cardId, name } })
+        for (const perk of perks) {
+          const usageCount = await prisma.usage.count({ where: { perkId: perk.id } })
+          if (usageCount > 0) {
+            result.keptWithUsage.push(`${cardId}: ${name} (${usageCount} usage rows)`)
+            continue
+          }
           await prisma.perk.delete({ where: { id: perk.id } })
           result.removed.push(`${cardId}: ${name}`)
         }
