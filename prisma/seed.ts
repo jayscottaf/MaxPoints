@@ -78,12 +78,6 @@ async function main() {
     { name: 'Lululemon Credit Q4', maxValue: 75, periodType: 'quarterly', category: 'shopping',
       startDate: new Date('2026-10-01'), endDate: new Date('2026-12-31'), enrollmentRequired: true },
 
-    // Semi-annual Saks Credits
-    { name: 'Saks Fifth Avenue Credit H1', maxValue: 50, periodType: 'semi-annual', category: 'shopping',
-      startDate: new Date('2026-01-01'), endDate: new Date('2026-06-30'), enrollmentRequired: true },
-    { name: 'Saks Fifth Avenue Credit H2', maxValue: 50, periodType: 'semi-annual', category: 'shopping',
-      startDate: new Date('2026-07-01'), endDate: new Date('2026-12-31'), enrollmentRequired: true },
-
     // Annual Credits
     { name: 'Hotel Credit (FHR/THC)', maxValue: 600, periodType: 'annual', category: 'travel',
       description: 'Up to $300 semi-annually on prepaid Fine Hotels & Resorts or Hotel Collection bookings' },
@@ -101,6 +95,8 @@ async function main() {
     { name: 'Oura Ring Credit', maxValue: 200, periodType: 'annual', category: 'wellness',
       enrollmentRequired: true },
     { name: 'Equinox Credit', maxValue: 300, periodType: 'annual', category: 'wellness' },
+    { name: 'SoulCycle At-Home Bike Credit', maxValue: 300, periodType: 'annual', category: 'wellness',
+      description: '$300 toward an at-home SoulCycle bike; requires active Equinox+ membership' },
     { name: 'Global Entry/TSA PreCheck', maxValue: 120, periodType: 'one-time', category: 'travel',
       notes: 'Every 4 years' }
   ]
@@ -132,11 +128,18 @@ async function main() {
       description: 'Eligible Hilton on-property dining' },
     { name: 'Waldorf/Conrad Credit', maxValue: 100, periodType: 'annual', category: 'travel',
       description: '2-night minimum prepaid stay' },
-    { name: 'CLEAR Plus Credit', maxValue: 189, periodType: 'annual', category: 'travel' },
+    { name: 'CLEAR Plus Credit', maxValue: 209, periodType: 'annual', category: 'travel' },
+    { name: 'Stadium/Arena Concessions Credit', maxValue: 250, periodType: 'annual', category: 'entertainment',
+      enrollmentRequired: true,
+      description: '10% back on qualifying concessions at select stadiums and arenas, up to $250/calendar year' },
     { name: 'Free Night Award', maxValue: 0, periodType: 'annual', category: 'travel',
       description: 'Annual free night certificate' },
     { name: 'Cell Phone Protection', maxValue: 800, periodType: 'annual', category: 'insurance',
-      description: 'Up to $800 per claim, 2 claims per year' }
+      description: 'Up to $800 per claim, 2 claims per year' },
+    { name: 'Hilton Honors Diamond Status', maxValue: 0, periodType: 'annual', category: 'status',
+      description: 'Info only: complimentary top-tier Hilton elite status (upgrades, lounge access, bonus points)' },
+    { name: 'National Emerald Club Executive Status', maxValue: 0, periodType: 'annual', category: 'status',
+      description: 'Info only: complimentary National Car Rental Emerald Club Executive status' }
   ]
 
   for (const perk of hiltonAspirePerks) {
@@ -153,7 +156,7 @@ async function main() {
     { name: 'Annual Travel Credit', maxValue: 300, periodType: 'annual', category: 'travel',
       description: 'Automatic credit for any travel purchases' },
     { name: 'The Edit Hotel Credit', maxValue: 500, periodType: 'annual', category: 'travel',
-      description: 'Two $250 credits for 2+ night prepaid bookings' },
+      description: 'Two $250 credits applied to your first two qualifying prepaid 2+ night bookings any time in the calendar year (no fixed half-year windows as of 2026)' },
     { name: '2026 Hotel Credit (One-Time)', maxValue: 250, periodType: 'one-time', category: 'travel',
       description: 'Special 2026 credit for select partner hotels',
       startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31') },
@@ -173,12 +176,27 @@ async function main() {
       description: 'Complimentary DashPass membership' },
     { name: 'DoorDash Credits', maxValue: 300, periodType: 'annual', category: 'dining',
       description: '$25/month in DoorDash credits' },
+    { name: 'Lyft Credit', maxValue: 120, periodType: 'annual', category: 'travel',
+      description: '$10/month in Lyft credit (up to $120/year), through 9/30/2027' },
+    { name: 'Peloton Credit', maxValue: 120, periodType: 'annual', category: 'wellness',
+      enrollmentRequired: true,
+      description: '$10/month in Peloton credit (up to $120/year), through 12/31/2027' },
     { name: 'Apple TV+ & Music', maxValue: 288, periodType: 'annual', category: 'entertainment',
       description: 'Complimentary subscriptions through June 2027' },
     { name: 'Global Entry/TSA PreCheck', maxValue: 120, periodType: 'one-time', category: 'travel',
       notes: 'Every 4 years' },
     { name: 'Priority Pass Select', maxValue: 469, periodType: 'annual', category: 'travel',
-      description: 'Estimated value of membership' }
+      description: 'Estimated value of membership' },
+    { name: 'IHG One Rewards Platinum Elite Status', maxValue: 0, periodType: 'annual', category: 'status',
+      enrollmentRequired: true,
+      description: 'Info only: complimentary IHG Platinum Elite status through 12/31/2027' },
+    { name: 'Marriott Bonvoy Gold Elite Status', maxValue: 0, periodType: 'annual', category: 'status',
+      enrollmentRequired: true,
+      description: 'Info only: complimentary Marriott Gold Elite status (limited-time registration/nights required)' },
+    { name: 'Chase Sapphire Lounge Access', maxValue: 0, periodType: 'annual', category: 'status',
+      description: 'Info only: complimentary access to Chase Sapphire Lounges by The Club, plus 2 guests' },
+    { name: '$75K Spend-Tier Perks', maxValue: 0, periodType: 'annual', category: 'status',
+      description: 'Info only: at $75K annual spend — $500 Southwest travel credit, Southwest A-List, $250 Shops at Chase credit, Hyatt Explorist, IHG Diamond' }
   ]
 
   for (const perk of chaseReservePerks) {
