@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Clock, DollarSign, AlertTriangle, Plus } from 'lucide-react'
+import { Check, Clock, DollarSign, AlertTriangle, Plus, History, Trash2 } from 'lucide-react'
 import { formatCurrency, daysUntil, getPercentageUsed, getPerkStatus } from '@/lib/utils'
 import { getPerkTip } from '@/lib/perk-tips'
 import { toast } from 'react-hot-toast'
@@ -11,10 +11,53 @@ interface PerkItemProps {
   onUsageUpdate: (perkId: string, amount: number) => void
 }
 
+interface UsageEntry {
+  id: string
+  amount: number
+  date: string
+}
+
 export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const [isLogging, setIsLogging] = useState(false)
   const [amount, setAmount] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [history, setHistory] = useState<UsageEntry[] | null>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+
+  const toggleHistory = async () => {
+    if (history !== null) {
+      setHistory(null)
+      return
+    }
+    setIsLoadingHistory(true)
+    try {
+      const response = await fetch(`/api/usage?perkId=${encodeURIComponent(perk.id)}`)
+      if (!response.ok) throw new Error('Failed to load usage')
+      setHistory(await response.json())
+    } catch {
+      toast.error('Could not load usage history. Please try again.')
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const deleteUsage = async (entry: UsageEntry) => {
+    if (!window.confirm(`Delete ${formatCurrency(entry.amount)} of usage for ${perk.name}?`)) return
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/usage?id=${encodeURIComponent(entry.id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete usage')
+      setHistory(entries => entries?.filter(item => item.id !== entry.id) ?? null)
+      const date = new Date(entry.date)
+      const inPeriod = date >= new Date(perk.periodStart) && date <= new Date(perk.periodEnd)
+      onUsageUpdate(perk.id, inPeriod ? -entry.amount : 0)
+      toast.success('Usage deleted')
+    } catch {
+      toast.error('Could not delete usage. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const currentUsage = perk.currentUsage || 0
   const percentUsed = getPercentageUsed(currentUsage, perk.maxValue)
@@ -51,6 +94,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         onUsageUpdate(perk.id, usageAmount)
         setAmount('')
         setIsLogging(false)
+        setHistory(null)
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to log usage')
@@ -147,6 +191,37 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             />
           </div>
         </div>
+
+        <button
+          onClick={toggleHistory}
+          disabled={isLoadingHistory || isSaving}
+          aria-expanded={history !== null}
+          className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white disabled:opacity-60"
+        >
+          <History className="h-4 w-4" />
+          {isLoadingHistory ? 'Loading...' : history !== null ? 'Hide usage history' : 'Usage history'}
+        </button>
+        {history !== null && (
+          <ul className="divide-y divide-zinc-800 text-sm">
+            {history.length === 0 && <li className="py-2 text-zinc-400">No usage recorded.</li>}
+            {history.map(entry => (
+              <li key={entry.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="text-zinc-300">
+                  {formatCurrency(entry.amount)} <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+                </span>
+                <button
+                  onClick={() => deleteUsage(entry)}
+                  disabled={isSaving}
+                  title="Delete usage"
+                  aria-label={`Delete ${formatCurrency(entry.amount)} usage from ${new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-zinc-400 hover:bg-red-950 hover:text-red-300 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {status !== 'completed' && (
           <div>

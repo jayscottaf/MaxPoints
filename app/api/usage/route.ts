@@ -141,9 +141,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Usage ID required' }, { status: 400 })
     }
 
-    await prisma.usage.delete({
-      where: { id }
+    const user = await prisma.user.findFirst()
+    if (!user) {
+      return NextResponse.json({ error: 'No user found' }, { status: 404 })
+    }
+
+    const deleted = await prisma.usage.deleteMany({
+      where: { id, userId: user.id }
     })
+
+    if (!deleted.count) {
+      return NextResponse.json({ error: 'Usage not found' }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
