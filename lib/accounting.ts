@@ -38,13 +38,13 @@ export function periodLimit(perk: PerkTerms, date = new Date()) {
   return (perk.periodValue ?? perk.maxValue) + (perk.periodType === 'monthly' && date.getUTCMonth() === 11 ? (perk.decemberBonus ?? 0) : 0)
 }
 
-export function summarizePerk<T extends PerkTerms & { usage: UsageValue[] }>(perk: T, year = calendarYear(), timezone = DEFAULT_TIMEZONE) {
-  const range = periodRange(perk, year, new Date(), timezone)
+export function summarizePerk<T extends PerkTerms & { usage: UsageValue[] }>(perk: T, year = calendarYear(), timezone = DEFAULT_TIMEZONE, now = new Date()) {
+  const range = periodRange(perk, year, now, timezone)
   const active = perk.usage.filter(u => !u.deletedAt)
   const currentUsage = sumMoney(active.filter(u => !u.needsReview && new Date(u.date) >= range.start && new Date(u.date) <= range.end).map(u => u.amount))
   const annualUsage = sumMoney(active.filter(u => new Date(u.date).getUTCFullYear() === year).map(u => u.amount))
   const maxValue = periodLimit(perk, range.start)
-  const today = new Date(calendarDate(new Date(), timezone) + 'T12:00:00Z')
+  const today = new Date(calendarDate(now, timezone) + 'T12:00:00Z')
   const available = today >= range.start && today <= range.end
   const remaining = Math.max(0, Math.min(cents(maxValue) - cents(currentUsage), cents(perk.maxValue) - cents(annualUsage))) / 100
   const { usage: _usage, ...terms } = perk

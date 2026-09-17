@@ -32,6 +32,7 @@ async function main() {
     server.close()
     child.kill('SIGTERM')
     await prisma.$transaction([
+      prisma.perkRevision.deleteMany({ where: { userId: user.id } }), prisma.emailDelivery.deleteMany({ where: { userId: user.id } }), prisma.notification.deleteMany({ where: { userId: user.id } }),
       prisma.session.deleteMany({ where: { userId: user.id } }), prisma.usage.deleteMany({ where: { userId: user.id } }),
       prisma.userCard.deleteMany({ where: { userId: user.id } }), prisma.perk.deleteMany({ where: { cardId: card.id } }),
       prisma.card.delete({ where: { id: card.id } }), prisma.user.delete({ where: { id: user.id } }),

@@ -23,6 +23,7 @@ export function withOwner<A extends unknown[]>(handler: (request: NextRequest, .
       response.headers.set('Cache-Control', 'private, no-store')
       return response
     } catch (error) {
+      if (error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid JSON request.' }, { status: 400 })
       console.error('Request failed:', error instanceof Error ? error.name : 'Unknown error')
       return NextResponse.json({ error: 'Temporarily unavailable. Please retry.' }, { status: 503 })
     }
