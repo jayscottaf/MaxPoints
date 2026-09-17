@@ -1,38 +1,105 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CreditCard } from 'lucide-react'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Command, ArrowRight, ShieldCheck } from "lucide-react";
 
 export default function Login() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
-  const [sent, setSent] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   async function submit(event: React.FormEvent) {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
+    event.preventDefault();
+    setBusy(true);
+    setError("");
     try {
-      const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, ...(sent ? { code } : {}) }) })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
-      if (data.signedIn) { router.replace('/'); router.refresh() }
-      else setSent(true)
-    } catch (error) { setError(error instanceof Error ? error.message : 'Could not sign in.') }
-    finally { setBusy(false) }
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, ...(sent ? { code } : {}) }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      if (data.signedIn) {
+        router.replace("/");
+        router.refresh();
+      } else setSent(true);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not sign in.");
+    } finally {
+      setBusy(false);
+    }
   }
-  return <main className="min-h-screen bg-[#0f1117] px-6 py-20 text-white">
-    <form onSubmit={submit} className="mx-auto max-w-sm space-y-6">
-      <CreditCard className="h-10 w-10 text-blue-400" />
-      <h1 className="text-3xl font-semibold">MaxPoints</h1>
-      <label className="block">Email<input type="email" autoComplete="email" required value={email} disabled={sent || busy} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 p-3" /></label>
-      {sent && <label className="block">Sign-in code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} required autoFocus value={code} onChange={e => setCode(e.target.value)} className="mt-2 w-full rounded border border-zinc-700 bg-zinc-900 p-3" /></label>}
-      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-      <button disabled={busy} className="w-full rounded bg-blue-600 p-3 font-medium disabled:opacity-50">{busy ? 'Please wait...' : sent ? 'Sign in' : 'Email me a code'}</button>
-      {sent && <button type="button" disabled={busy} onClick={() => { setSent(false); setCode(''); setError('') }} className="text-sm text-zinc-400">Request another code</button>}
-    </form>
-  </main>
+  return (
+    <main className="login-page">
+      <form onSubmit={submit} className="login-form">
+        <div className="login-brand">
+          <span className="brand-mark">
+            <Command size={22} />
+          </span>
+          MaxPoints.
+        </div>
+        <p className="eyebrow">YOUR PRIVATE WALLET</p>
+        <h1>{sent ? "Check your inbox." : "Welcome back."}</h1>
+        <label>
+          Email
+          <input
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            disabled={sent || busy}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
+        </label>
+        {sent && (
+          <label>
+            Sign-in code
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{8}"
+              maxLength={8}
+              required
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="8-digit code"
+            />
+          </label>
+        )}
+        {error && (
+          <p role="alert" className="error-banner">
+            {error}
+          </p>
+        )}
+        <button disabled={busy} className="primary-button">
+          {busy ? "Please wait..." : sent ? "Sign in" : "Email me a code"}
+          <ArrowRight size={16} />
+        </button>
+        {sent && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setSent(false);
+              setCode("");
+              setError("");
+            }}
+            className="text-action"
+          >
+            Request another code
+          </button>
+        )}
+        <p className="login-note">
+          <ShieldCheck size={13} />
+          Owner-only access
+        </p>
+      </form>
+    </main>
+  );
 }

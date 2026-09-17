@@ -1,251 +1,525 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CardSummary } from '@/components/card-summary'
-import { CardSettingsModal } from '@/components/card-settings-modal'
-import { PerkItem } from '@/components/perk-item'
-import { SummaryOverview } from '@/components/summary-overview'
-import { DashboardSkeleton } from '@/components/dashboard-skeleton'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { formatCurrency, formatDateOnly } from '@/lib/utils'
-import { calendarYear, sumMoney } from '@/lib/accounting'
-import { cardsSchema, upcomingPerks, type CardDetail } from '@/lib/dashboard'
-import { CreditCard, Calendar, Bell, AlertTriangle, CheckCircle2, LogOut, RefreshCw } from 'lucide-react'
-import { Toaster } from 'react-hot-toast'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  LayoutDashboard,
+  Wallet,
+  Gift,
+  History,
+  Settings2,
+  LogOut,
+  Plus,
+  ArrowUpRight,
+  ArrowRight,
+  RefreshCw,
+  ShieldCheck,
+  Check,
+  Command,
+  AlertCircle,
+} from "lucide-react";
+import { Toaster } from "react-hot-toast";
+import { CardSummary } from "@/components/card-summary";
+import { CardSettingsModal } from "@/components/card-settings-modal";
+import { PerkItem } from "@/components/perk-item";
+import { SummaryOverview } from "@/components/summary-overview";
+import { BenefitBrowser, BenefitRow } from "@/components/benefit-browser";
+import { ActivityView } from "@/components/activity-view";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { calendarYear, sumMoney } from "@/lib/accounting";
+import { cardsSchema, upcomingPerks, type CardDetail } from "@/lib/dashboard";
+import { formatCurrency } from "@/lib/utils";
 
-const DUE_PERKS_COLLAPSED_COUNT = 6
-
-function getDueUrgency(daysLeft: number, isOneTime: boolean) {
-  if (isOneTime) {
-    return {
-      badge: 'bg-purple-900/50 text-purple-200 border-purple-700/50',
-      accent: 'border-l-purple-500',
-      label: 'one-time',
-      showAlert: false,
-    }
-  }
-
-  if (daysLeft === 0) {
-    return {
-      badge: 'bg-red-900/60 text-red-200 border-red-700/60',
-      accent: 'border-l-red-500',
-      label: 'Due today',
-      showAlert: true,
-    }
-  }
-
-  if (daysLeft <= 14) {
-    return {
-      badge: 'bg-orange-900/50 text-orange-200 border-orange-700/60',
-      accent: 'border-l-orange-500',
-      label: `${daysLeft} days left`,
-      showAlert: true,
-    }
-  }
-
-  if (daysLeft <= 30) {
-    return {
-      badge: 'bg-yellow-900/50 text-yellow-200 border-yellow-700/60',
-      accent: 'border-l-yellow-500',
-      label: `${daysLeft} days left`,
-      showAlert: true,
-    }
-  }
-
-  return {
-    badge: 'bg-blue-900/40 text-blue-200 border-blue-700/50',
-    accent: 'border-l-blue-500',
-    label: `${daysLeft} days left`,
-    showAlert: false,
-  }
-}
+const views = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "benefits", label: "Benefits", icon: Gift },
+  { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "activity", label: "Activity", icon: History },
+] as const;
+type View = (typeof views)[number]["id"];
 
 export default function Dashboard() {
-  const router = useRouter()
-  const [cards, setCards] = useState<CardDetail[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [year, setYear] = useState(calendarYear)
-  const [error, setError] = useState('')
-  const requestController = useRef<AbortController | null>(null)
-  const selectedCard = cards.find(card => card.id === selectedId)
-  const perks = selectedCard?.perks ?? []
-  const allPerks = cards.flatMap(card => card.perks)
-  const [loading, setLoading] = useState(true)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [showAllDuePerks, setShowAllDuePerks] = useState(false)
-
+  const router = useRouter();
+  const [cards, setCards] = useState<CardDetail[]>([]);
+  const [view, setView] = useState<View>("overview");
+  const [benefitFilter, setBenefitFilter] = useState<"all" | "review">("all");
+  const [year, setYear] = useState(calendarYear);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedPerkId, setSelectedPerkId] = useState<string | null>(null);
+  const [settings, setSettings] = useState(false);
+  const [logPicker, setLogPicker] = useState(false);
+  const [allDue, setAllDue] = useState(false);
+  const [activityVersion, setActivityVersion] = useState(0);
+  const controllerRef = useRef<AbortController | null>(null);
   const fetchDashboardData = useCallback(async () => {
-    requestController.current?.abort()
-    const controller = new AbortController()
-    requestController.current = controller
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setRefreshing(true);
     try {
-      const response = await fetch(`/api/cards?year=${year}`, { signal: controller.signal, cache: 'no-store' })
-      if (response.status === 401) { router.replace('/login'); router.refresh(); return }
-      if (!response.ok) throw new Error('Could not load your cards. Please retry.')
-      const data = cardsSchema.safeParse(await response.json())
-      if (!data.success) throw new Error('The server returned incomplete card data. Please retry.')
-      if (!controller.signal.aborted) { setCards(data.data); setError('') }
+      const response = await fetch(`/api/cards?year=${year}`, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (response.status === 401) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+      if (!response.ok)
+        throw new Error("Could not load your wallet. Please retry.");
+      const parsed = cardsSchema.safeParse(await response.json());
+      if (!parsed.success)
+        throw new Error("Your wallet data is incomplete. Please retry.");
+      if (!controller.signal.aborted) {
+        setCards(parsed.data);
+        setActivityVersion((value) => value + 1);
+        setError("");
+      }
     } catch (error) {
-      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Could not load your cards.')
+      if (!controller.signal.aborted)
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Could not load your wallet.",
+        );
     } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [year, router])
-  useEffect(() => { void fetchDashboardData(); return () => requestController.current?.abort() }, [fetchDashboardData])
-  const handleUsageUpdate = () => { void fetchDashboardData() }
-
-  const totalAnnualFees = cards.reduce((sum, card) => sum + card.annualFee, 0)
-  const valuedPerks = allPerks.filter(perk => !['coverage', 'estimate'].includes(perk.valueKind))
-  const totalPerksValue = sumMoney(valuedPerks.map(perk => perk.annualValue))
-  const totalUsed = sumMoney(valuedPerks.map(perk => perk.annualUsage))
-  const upcomingUnusedPerks = upcomingPerks(allPerks)
-  const visibleDuePerks = showAllDuePerks
-    ? upcomingUnusedPerks
-    : upcomingUnusedPerks.slice(0, DUE_PERKS_COLLAPSED_COUNT)
-
-  const header = (
-    <header className="bg-[#1a1b23] border-b border-zinc-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
-            <CreditCard className="h-8 w-8 text-blue-500" />
-            <h1 className="text-2xl font-bold text-white">MaxPoints</h1>
-          </div>
-          <div className="flex items-center gap-2">
-          <select aria-label="Reporting year" value={year} onChange={e => { setLoading(true); setYear(Number(e.target.value)); setSelectedId(null) }} className="rounded border border-zinc-700 bg-zinc-900 p-2 text-white">
-            {Array.from({ length: 8 }, (_, i) => calendarYear() + 1 - i).map(value => <option key={value} value={value}>{value}</option>)}
-          </select>
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-          >
-            <Bell className="h-5 w-5" />
-            <span>Settings</span>
-          </button>
-          <button title="Sign out" aria-label="Sign out" onClick={async () => { const response = await fetch('/api/auth', { method: 'DELETE' }); if (response.ok) { router.replace('/login'); router.refresh() } else setError('Could not sign out. Please retry.') }} className="rounded p-2 text-zinc-300 hover:bg-zinc-800"><LogOut className="h-5 w-5" /></button>
-          </div>
-        </div>
-      </div>
-    </header>
-  )
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0f1117]">
-        {header}
-        <DashboardSkeleton />
-      </div>
-    )
+  }, [year, router]);
+  useEffect(() => {
+    void fetchDashboardData();
+    return () => controllerRef.current?.abort();
+  }, [fetchDashboardData]);
+  const perks = cards.flatMap((card) => card.perks);
+  const selectedPerk = perks.find((perk) => perk.id === selectedPerkId);
+  const selectedCard = cards.find((card) => card.id === selectedCardId);
+  const valued = perks.filter(
+    (perk) => !["coverage", "estimate"].includes(perk.valueKind),
+  );
+  const totalUsed = sumMoney(valued.map((perk) => perk.annualUsage));
+  const annualFees = sumMoney(cards.map((card) => card.annualFee));
+  const due = upcomingPerks(perks);
+  const soon = due.filter((perk) => perk.daysLeft <= 30);
+  const reviewCount = perks.filter((perk) => perk.needsReview).length;
+  function selectPerk(id: string) {
+    setSelectedCardId(null);
+    setLogPicker(false);
+    setSelectedPerkId(id);
   }
-
+  function updateUsage() {
+    void fetchDashboardData();
+  }
+  function navigate(next: View) {
+    setView(next);
+    setBenefitFilter("all");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  const navigation = (
+    <>
+      {views.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          aria-current={view === id ? "page" : undefined}
+          onClick={() => navigate(id)}
+        >
+          <Icon size={19} strokeWidth={1.7} />
+          <span>{label}</span>
+          {id === "benefits" && perks.length > 0 && (
+            <small>{perks.length}</small>
+          )}
+        </button>
+      ))}
+    </>
+  );
   return (
-    <div className="min-h-screen bg-[#0f1117]">
-      <Toaster position="top-right" />
-
-      {header}
-
-      {/* Summary Stats */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 border-l-2 border-red-400 p-3 text-red-300"><span>{error}{cards.length > 0 ? ' Showing last loaded data.' : ''}</span><button onClick={fetchDashboardData} className="flex items-center gap-2 rounded border border-red-400 px-3 py-1"><RefreshCw className="h-4 w-4" />Retry</button></div>}
-        <SummaryOverview
-          totalAnnualFees={totalAnnualFees}
-          totalPerksValue={totalPerksValue}
-          totalUsed={totalUsed}
-        />
-
-        {/* Cards Grid */}
-        <h2 className="text-xl font-semibold mb-4 text-white">Your Cards</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {cards.map(card => (
-            <CardSummary key={card.id} card={card} onSelect={card => setSelectedId(card.id)} />
-          ))}
-        </div>
-
-        <section>
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+    <div className="app-shell">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: "#182d24",
+            color: "#fff",
+            borderRadius: "8px",
+            fontSize: "14px",
+          },
+        }}
+      />
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <aside className="sidebar">
+        <Link href="/" className="brand" onClick={() => navigate("overview")}>
+          <span className="brand-mark">
+            <Command size={21} />
+          </span>
+          MaxPoints<span className="brand-period">.</span>
+        </Link>
+        <p className="nav-label">WORKSPACE</p>
+        <nav aria-label="Main navigation">{navigation}</nav>
+        <div className="sidebar-bottom">
+          <button onClick={() => setSettings(true)}>
+            <Settings2 size={18} />
+            Settings
+          </button>
+          <div className="owner-badge">
+            <span className="owner-avatar">M</span>
             <div>
-              <h2 className="text-xl font-semibold text-white">Credits Coming Due</h2>
+              <strong>Personal wallet</strong>
+              <span>Owner account</span>
             </div>
-            {upcomingUnusedPerks.length > DUE_PERKS_COLLAPSED_COUNT && (
-              <button
-                onClick={() => setShowAllDuePerks((value) => !value)}
-                className="self-start sm:self-auto px-3 py-2 text-sm rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
-              >
-                {showAllDuePerks ? 'Show less' : `Show all ${upcomingUnusedPerks.length}`}
-              </button>
-            )}
+            <ShieldCheck size={16} />
           </div>
-
-          {upcomingUnusedPerks.length === 0 ? (
-            <div className="border border-zinc-800 rounded-lg bg-[#1a1b23] p-6 flex items-center gap-3 text-zinc-300">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-              <span>No unused perks with upcoming due dates right now.</span>
+        </div>
+      </aside>
+      <div className="workspace">
+        <header className="topbar">
+          <Link href="/" className="mobile-brand" onClick={() => navigate("overview")}>
+            <Command size={21} />
+            MaxPoints.
+          </Link>
+          <span className="breadcrumb">
+            Workspace <span>/</span>{" "}
+            <b>{views.find((item) => item.id === view)?.label}</b>
+          </span>
+          <div className="topbar-actions">
+            <span className="private-label">
+              <ShieldCheck size={14} />
+              Private workspace
+            </span>
+            <button
+              className="icon-button"
+              title="Settings"
+              aria-label="Settings"
+              onClick={() => setSettings(true)}
+            >
+              <Settings2 size={18} />
+            </button>
+            <button
+              className="icon-button"
+              title="Sign out"
+              aria-label="Sign out"
+              onClick={async () => {
+                try {
+                  const response = await fetch("/api/auth", {
+                    method: "DELETE",
+                  });
+                  if (!response.ok) throw new Error();
+                  router.replace("/login");
+                  router.refresh();
+                } catch {
+                  setError("Could not sign out. Please retry.");
+                }
+              }}
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+        <main id="main" className="main-content">
+          <div className="page-heading">
+            <div>
+              <p className="eyebrow">YOUR PERSONAL ADVANTAGE</p>
+              <h1>
+                {view === "overview"
+                  ? "Overview"
+                  : view === "benefits"
+                    ? "Benefits"
+                    : view === "wallet"
+                      ? "Wallet"
+                      : "Activity"}
+              </h1>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {visibleDuePerks.map((perk) => {
-                const urgency = getDueUrgency(perk.daysLeft, perk.isOneTime)
-
-                return (
-                  <button
-                    key={perk.id}
-                    onClick={() => setSelectedId(perk.cardId)}
-                    className={`text-left bg-[#1a1b23] border border-zinc-800 border-l-4 ${urgency.accent} rounded-lg p-4 hover:border-zinc-600 transition-colors`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${urgency.badge}`}>
-                            {urgency.showAlert && <AlertTriangle className="h-3 w-3" />}
-                            {urgency.label}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-400">{perk.card?.name}</p>
-                        <h3 className="font-semibold text-white truncate">{perk.name}</h3>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-lg font-bold text-blue-300">{formatCurrency(perk.availableValue)}</p>
-                        <p className="text-xs text-zinc-400">unused</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
-                      <Calendar className="h-4 w-4 text-zinc-500" />
-                      <span>{perk.isOneTime ? 'Track by benefit cycle' : perk.periodEnd ? `Due ${formatDateOnly(perk.periodEnd)}` : ''}</span>
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="page-actions">
+              <select
+                aria-label="Reporting year"
+                value={year}
+                onChange={(e) => {
+                  setLoading(true);
+                  setYear(Number(e.target.value));
+                  setSelectedPerkId(null);
+                  setSelectedCardId(null);
+                }}
+              >
+                {Array.from(
+                  { length: 8 },
+                  (_, i) => calendarYear() + 1 - i,
+                ).map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+              <button
+                className="primary-button"
+                onClick={() => setLogPicker(true)}
+                disabled={loading || !perks.length}
+              >
+                <Plus size={17} />
+                <span>Log usage</span>
+              </button>
+            </div>
+          </div>
+          {error && (
+            <div role="alert" className="error-banner">
+              <AlertCircle size={18} />
+              <span>
+                {error}
+                {cards.length > 0 ? " Showing last loaded data." : ""}
+              </span>
+              <button className="text-action" onClick={fetchDashboardData}>
+                <RefreshCw size={16} />
+                Retry
+              </button>
             </div>
           )}
-        </section>
-      </div>
-
-      {/* Perks Modal */}
-      <Dialog open={!!selectedCard} onOpenChange={(open) => !open && setSelectedId(null)}>
-        {selectedCard && (
-          <DialogContent
-            title={`${selectedCard.name} Perks`}
-            description={selectedCard.issuer}
-            onClose={() => setSelectedId(null)}
-            className="max-w-4xl"
-          >
-            <div className="grid grid-cols-1 gap-4">
-              {perks.map((perk) => (
-                <PerkItem key={perk.id} perk={perk} onUsageUpdate={handleUsageUpdate} />
-              ))}
+          {loading ? (
+            <div
+              className="dashboard-loading"
+              role="status"
+              aria-label="Loading wallet"
+            >
+              <div />
+              <div />
+              <div />
             </div>
+          ) : (
+            <>
+              {view === "overview" && (
+                <>
+                  <SummaryOverview
+                    totalAnnualFees={annualFees}
+                    totalPerksValue={sumMoney(
+                      valued.map((perk) => perk.annualValue),
+                    )}
+                    totalUsed={totalUsed}
+                    available={sumMoney(
+                      valued.map((perk) => perk.availableValue),
+                    )}
+                  />
+                  <section className="wallet-section">
+                    <div className="section-heading">
+                      <h2>
+                        Your wallet <span>{cards.length}</span>
+                      </h2>
+                      <button
+                        className="text-action"
+                        onClick={() => navigate("wallet")}
+                      >
+                        View wallet
+                        <ArrowUpRight size={15} />
+                      </button>
+                    </div>
+                    <div className="wallet-grid">
+                      {cards.map((card) => (
+                        <CardSummary
+                          key={card.id}
+                          card={card}
+                          onSelect={(card) => setSelectedCardId(card.id)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                  <section className="due-section" data-expanded={allDue}>
+                    <div className="section-heading">
+                      <div>
+                        <p className="eyebrow">DON&apos;T LEAVE IT BEHIND</p>
+                        <h2>Up next</h2>
+                      </div>
+                      <span className="due-total">
+                        {formatCurrency(
+                          sumMoney(soon.map((perk) => perk.availableValue)),
+                        )}{" "}
+                        <span>expires in 30 days</span>
+                      </span>
+                    </div>
+                    <div className="list-heading">
+                      <span>BENEFIT</span>
+                      <span>EXPIRES</span>
+                      <span>STATUS</span>
+                      <span>REMAINING</span>
+                    </div>
+                    <div className="benefit-list">
+                      {(allDue ? due : due.slice(0, 6)).map((perk) => (
+                        <BenefitRow
+                          key={perk.id}
+                          perk={perk}
+                          onSelect={selectPerk}
+                          due
+                        />
+                      ))}
+                      {!due.length && (
+                        <div className="empty-state">
+                          <Check size={26} />
+                          <h3>You&apos;re all caught up</h3>
+                          <p>No unused benefits with an upcoming expiry.</p>
+                        </div>
+                      )}
+                    </div>
+                    {due.length > 3 && (
+                      <button
+                        className="show-more"
+                        data-short={due.length <= 6}
+                        onClick={() => setAllDue((value) => !value)}
+                      >
+                        {allDue
+                          ? "Show fewer benefits"
+                          : `View all ${due.length} upcoming benefits`}
+                        <ArrowRight size={15} />
+                      </button>
+                    )}
+                  </section>
+                  {reviewCount > 0 && (
+                    <div className="review-note">
+                      <AlertCircle size={17} />
+                      <span>
+                        {reviewCount}{" "}
+                        {reviewCount === 1 ? "benefit has" : "benefits have"}{" "}
+                        historical usage to review.
+                      </span>
+                      <button
+                        className="text-action"
+                        onClick={() => {
+                          navigate("benefits");
+                          setBenefitFilter("review");
+                        }}
+                      >
+                        Review benefits
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {view === "wallet" && (
+                <>
+                  <div className="section-heading">
+                    <span className="muted">{cards.length} active cards</span>
+                    <button
+                      className="text-action"
+                      onClick={() => setSettings(true)}
+                    >
+                      <Settings2 size={16} />
+                      Card details
+                    </button>
+                  </div>
+                  <div className="wallet-grid">
+                    {cards.map((card) => (
+                      <CardSummary
+                        key={card.id}
+                        card={card}
+                        onSelect={(card) => setSelectedCardId(card.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {view === "benefits" && (
+                <BenefitBrowser
+                  perks={perks}
+                  onSelect={selectPerk}
+                  initialFilter={benefitFilter}
+                />
+              )}
+              {view === "activity" && (
+                <ActivityView
+                  key={activityVersion}
+                  year={year}
+                  onSelect={selectPerk}
+                />
+              )}
+              {!cards.length && (
+                <div className="empty-state">
+                  <Wallet size={30} />
+                  <h2>No active cards</h2>
+                  <p>Your connected cards will appear here.</p>
+                </div>
+              )}
+              <footer className="workspace-footer">
+                <span>
+                  <span
+                    className={`status-dot ${refreshing ? "syncing" : ""}`}
+                  />
+                  {refreshing ? "Updating wallet" : "Wallet up to date"}
+                </span>
+                <button
+                  className="text-action"
+                  onClick={fetchDashboardData}
+                  disabled={refreshing}
+                  title="Refresh wallet"
+                >
+                  <RefreshCw size={13} />
+                  Refresh
+                </button>
+                <span>MaxPoints / {year}</span>
+              </footer>
+            </>
+          )}
+        </main>
+      </div>
+      <nav className="mobile-nav" aria-label="Mobile navigation">
+        {navigation}
+      </nav>
+      <Dialog
+        open={!!selectedPerk}
+        onOpenChange={(open) => !open && setSelectedPerkId(null)}
+      >
+        {selectedPerk && (
+          <DialogContent
+            title={selectedPerk.name}
+            description={selectedPerk.card.name}
+            className="max-w-2xl"
+            onClose={() => setSelectedPerkId(null)}
+          >
+            <PerkItem
+              key={selectedPerk.id}
+              perk={selectedPerk}
+              onUsageUpdate={updateUsage}
+            />
           </DialogContent>
         )}
       </Dialog>
-
-      {showSettingsModal && (
+      <Dialog
+        open={!!selectedCard}
+        onOpenChange={(open) => !open && setSelectedCardId(null)}
+      >
+        {selectedCard && (
+          <DialogContent
+            title={selectedCard.name}
+            description={`${selectedCard.perks.length} benefits`}
+            className="max-w-4xl"
+            onClose={() => setSelectedCardId(null)}
+          >
+            <BenefitBrowser perks={selectedCard.perks} onSelect={selectPerk} />
+          </DialogContent>
+        )}
+      </Dialog>
+      <Dialog open={logPicker} onOpenChange={setLogPicker}>
+        <DialogContent
+          title="Log usage"
+          description="Select a benefit"
+          className="max-w-4xl"
+          onClose={() => setLogPicker(false)}
+        >
+          <BenefitBrowser
+            perks={perks}
+            onSelect={selectPerk}
+            initialFilter="available"
+          />
+        </DialogContent>
+      </Dialog>
+      {settings && (
         <CardSettingsModal
           cards={cards}
-          onClose={() => setShowSettingsModal(false)}
+          onClose={() => setSettings(false)}
           onSaved={fetchDashboardData}
         />
       )}
     </div>
-  )
+  );
 }

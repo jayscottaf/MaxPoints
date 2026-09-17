@@ -1,99 +1,69 @@
-'use client'
+import { ArrowUpRight, Check } from "lucide-react";
+import {
+  formatCurrency,
+  formatExpirationMonth,
+  isPastDateOnly,
+} from "@/lib/utils";
+import { sumMoney } from "@/lib/accounting";
+import type { CardDetail } from "@/lib/dashboard";
+import { CardArt } from "./card-art";
 
-import { CreditCard, Calendar } from 'lucide-react'
-import { formatCurrency, formatExpirationMonth, getCardBrand, isPastDateOnly } from '@/lib/utils'
-import { sumMoney } from '@/lib/accounting'
-import type { CardDetail } from '@/lib/dashboard'
-
-interface CardSummaryProps {
-  card: CardDetail
-  onSelect: (card: CardDetail) => void
-}
-
-export function CardSummary({ card, onSelect }: CardSummaryProps) {
-  const valued = card.perks.filter(perk => !['coverage', 'estimate'].includes(perk.valueKind))
-  const totalMaxValue = sumMoney(valued.map(perk => perk.annualValue))
-  const totalUsed = sumMoney(valued.map(perk => perk.annualUsage))
-  const remainingValue = sumMoney(valued.map(perk => perk.availableValue))
-  const netCost = card.annualFee - totalUsed
-  const coveragePercent = card.annualFee > 0 ? (totalUsed / card.annualFee) * 100 : 0
-  const expirationDate = card.userCards?.[0]?.expirationDate
-  const last4 = card.userCards?.[0]?.last4
-  const cardExpired = expirationDate ? isPastDateOnly(expirationDate) : false
-  const brand = getCardBrand(card)
-
+export function CardSummary({
+  card,
+  onSelect,
+}: {
+  card: CardDetail;
+  onSelect: (card: CardDetail) => void;
+}) {
+  const valued = card.perks.filter(
+    (perk) => !["coverage", "estimate"].includes(perk.valueKind),
+  );
+  const used = sumMoney(valued.map((perk) => perk.annualUsage));
+  const available = sumMoney(valued.map((perk) => perk.availableValue));
+  const coverage =
+    card.annualFee > 0 ? Math.floor((used / card.annualFee) * 100) : 0;
+  const userCard = card.userCards[0];
   return (
     <button
-      type="button"
-      className="group relative w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#1a1b23] p-6 text-left shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-600 hover:shadow-xl hover:shadow-black/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="wallet-card"
       onClick={() => onSelect(card)}
+      aria-label={`View ${card.name} benefits`}
     >
-      {/* Brand accent stripe */}
-      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${brand.gradient}`} />
-
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${brand.chipBg}`}>
-            <CreditCard className={`h-6 w-6 ${brand.accent}`} />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white">{card.name}</h3>
-            <p className="text-sm text-zinc-400">{card.issuer}</p>
-            {last4 && <p className="mt-1 text-xs text-zinc-400">Card ending {last4}</p>}
-          </div>
-        </div>
-        {expirationDate && (
-          <div className={`flex items-center text-sm ${cardExpired ? 'text-red-400' : 'text-zinc-400'}`}>
-            <Calendar className="mr-1 h-4 w-4" />
-            <span>
-              {cardExpired ? 'Expired' : 'Expires'} {formatExpirationMonth(expirationDate)}
-            </span>
-          </div>
-        )}
+      <div className="wallet-card-top">
+        <CardArt name={card.name} />
+        <ArrowUpRight className="wallet-arrow" size={18} />
       </div>
-
-      <div className="mb-4 grid grid-cols-2 gap-4">
+      <div className="wallet-card-name">
+        <h3>{card.name}</h3>
+        <span>
+          {userCard?.last4 ? `Ending ${userCard.last4}` : card.issuer}
+        </span>
+      </div>
+      <div className="wallet-values">
         <div>
-          <p className="text-sm text-zinc-400">Annual Fee</p>
-          <p className="text-xl font-bold text-white">{formatCurrency(card.annualFee)}</p>
+          <span>Recovered</span>
+          <strong>{formatCurrency(used)}</strong>
         </div>
         <div>
-          <p className="text-sm text-zinc-400">Net Cost</p>
-          <p className={`text-xl font-bold ${netCost <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {formatCurrency(netCost)}
-          </p>
+          <span>Available</span>
+          <strong>{formatCurrency(available)}</strong>
         </div>
       </div>
-
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">Total Perks Value</span>
-          <span className="font-medium text-zinc-200">{formatCurrency(totalMaxValue)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">Used to Date</span>
-          <span className="font-medium text-zinc-200">{formatCurrency(totalUsed)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">Available Now</span>
-          <span className="font-medium text-blue-400">{formatCurrency(remainingValue)}</span>
-        </div>
+      <div className="wallet-card-footer">
+        <span className={coverage >= 100 ? "positive" : ""}>
+          {coverage >= 100 && <Check size={13} />}
+          {coverage >= 100 ? "Fee covered" : `${coverage}% of fee covered`}
+        </span>
+        <span>{formatCurrency(card.annualFee)} / yr</span>
       </div>
-
-      <div className="mt-4">
-        <div className="mb-1 flex justify-between text-sm">
-          <span className="text-zinc-400">Fee Coverage</span>
-          <span className="font-medium text-zinc-200">{coveragePercent.toFixed(0)}%</span>
-        </div>
-        <div className="h-2 w-full rounded-full bg-zinc-800">
-          <div
-            className={`h-2 rounded-full transition-all ${
-              coveragePercent >= 100 ? 'bg-emerald-500' : 'bg-blue-500'
-            }`}
-            style={{ width: `${Math.min(coveragePercent, 100)}%` }}
-          />
-        </div>
+      <div className="progress-track">
+        <span style={{ width: `${Math.min(100, coverage)}%` }} />
       </div>
+      {userCard?.expirationDate && isPastDateOnly(userCard.expirationDate) && (
+        <span className="expired-note">
+          Card expired {formatExpirationMonth(userCard.expirationDate)}
+        </span>
+      )}
     </button>
-  )
+  );
 }
