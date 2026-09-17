@@ -49,7 +49,8 @@ export function summarizePerk<T extends PerkTerms & { usage: UsageValue[] }>(per
   const remaining = Math.max(0, Math.min(cents(maxValue) - cents(currentUsage), cents(perk.maxValue) - cents(annualUsage))) / 100
   const { usage: _usage, ...terms } = perk
   void _usage
-  return { ...terms, maxValue, annualValue: perk.maxValue, currentUsage, annualUsage, periodStart: range.start.toISOString(), periodEnd: perk.periodType === 'one-time' && !perk.endDate ? null : range.end.toISOString(), available, availableValue: available && perk.valueKind !== 'coverage' && perk.valueKind !== 'estimate' ? remaining : 0, needsReview: active.some(u => u.needsReview), valueKind: perk.valueKind ?? 'credit' }
+  const oneTimeOutsideYear = perk.periodType === 'one-time' && (range.end.getUTCFullYear() < year || range.start.getUTCFullYear() > year || (currentUsage > 0 && annualUsage === 0))
+  return { ...terms, faceValue: perk.maxValue, maxValue, annualValue: oneTimeOutsideYear ? 0 : perk.maxValue, currentUsage, annualUsage, periodStart: range.start.toISOString(), periodEnd: perk.periodType === 'one-time' && !perk.endDate ? null : range.end.toISOString(), available, availableValue: available && perk.valueKind !== 'coverage' && perk.valueKind !== 'estimate' ? remaining : 0, needsReview: active.some(u => u.needsReview), valueKind: perk.valueKind ?? 'credit' }
 }
 
 export function validAmount(amount: unknown): amount is number {

@@ -45,3 +45,15 @@ export async function changeUsage(user: { id: string; timezone: string }, id: st
     return tx.usage.update({ where: { id }, data: { deletedAt: action === 'delete' ? new Date() : null } })
   }, { timeout: 15000 })
 }
+
+export async function editUsage(user: { id: string; timezone: string }, input: { id: string; date: string; amount: number; notes?: string }) {
+  if (!validAmount(input.amount)) throw new UsageError('Enter a positive amount with at most two decimal places.')
+  const date = usageDate(input.date, user.timezone)
+  return prisma.$transaction(async tx => {
+    const entry = await tx.usage.findFirst({ where: { id: input.id, userId: user.id, deletedAt: null } })
+    if (!entry) throw new UsageError('Usage not found.', 404)
+    await lock(tx, user.id, entry.perkId)
+    await validateCapacity(tx, user.id, entry.perkId, input.amount, date, user.timezone, entry.id)
+    return tx.usage.update({ where: { id: entry.id }, data: { amount: input.amount, date, notes: input.notes, needsReview: false } })
+  })
+}

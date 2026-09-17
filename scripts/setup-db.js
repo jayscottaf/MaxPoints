@@ -6,7 +6,7 @@ console.log('Setting up database...');
 try {
   // Run migrations
   console.log('Running migrations...');
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  execSync('npm run db:migrate', { stdio: 'inherit' });
 
   // Seed database
   console.log('Seeding database...');

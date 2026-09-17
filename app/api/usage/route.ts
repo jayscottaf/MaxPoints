@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withOwner, getOwner } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { createUsage, changeUsage, UsageError } from '@/lib/usage-service'
+import { createUsage, changeUsage, editUsage, UsageError } from '@/lib/usage-service'
 
 const inputSchema = z.object({ perkId: z.string().min(1).max(200), amount: z.number(), date: z.string().optional(), notes: z.string().max(2000).optional(), idempotencyKey: z.uuid() }).strict()
 function failure(error: unknown) {
@@ -33,7 +33,8 @@ export const DELETE = withOwner(async (request: NextRequest) => {
 })
 export const PATCH = withOwner(async (request: NextRequest) => {
   try {
-    const body = z.object({ id: z.string().min(1), action: z.literal('restore') }).strict().parse(await request.json())
+    const body = z.discriminatedUnion('action', [z.object({ id: z.string().min(1), action: z.literal('restore') }).strict(), z.object({ id: z.string().min(1), action: z.literal('edit'), amount: z.number(), date: z.string(), notes: z.string().max(2000).optional() }).strict()]).parse(await request.json())
+    if (body.action === 'edit') return NextResponse.json(await editUsage(await getOwner(), body))
     return NextResponse.json(await changeUsage(await getOwner(), body.id, body.action))
   } catch (error) { return failure(error) }
 })

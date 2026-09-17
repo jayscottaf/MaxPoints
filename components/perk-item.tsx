@@ -5,6 +5,8 @@ import { Check, Clock, DollarSign, AlertTriangle, Plus, History, Trash2, Undo2 }
 import { formatCurrency, daysUntilDateOnly, getPercentageUsed, getPerkStatus } from '@/lib/utils'
 import { calendarDate, cents } from '@/lib/accounting'
 import type { PerkDetail } from '@/lib/dashboard'
+import { PerkEditor } from '@/components/perk-editor'
+import { UsageEditor } from '@/components/usage-editor'
 import { getPerkTip } from '@/lib/perk-tips'
 import { toast } from 'react-hot-toast'
 
@@ -191,6 +193,9 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       </div>
 
       <div className="space-y-3">
+        <PerkEditor perk={perk} onSaved={() => onUsageUpdate(perk.id, 0)} />
+        {perk.notes && <p className="text-sm text-zinc-400 whitespace-pre-wrap">{perk.notes}</p>}
+        {perk.valueKind !== 'credit' && <p className="text-xs text-zinc-500">{perk.valueKind === 'coverage' ? 'Insurance coverage' : perk.valueKind === 'estimate' ? 'Estimated membership value' : 'Membership benefit'}</p>}
         <div>
           <div className="flex justify-between text-sm mb-1">
             <span className="text-zinc-400">
@@ -223,10 +228,11 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
           <ul className="divide-y divide-zinc-800 text-sm">
             {history.length === 0 && <li className="py-2 text-zinc-400">No usage recorded.</li>}
             {history.map(entry => (
-              <li key={entry.id} className="flex items-center justify-between gap-2 py-2">
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="text-zinc-300">
                   <span className={entry.deletedAt ? 'line-through' : ''}>{formatCurrency(entry.amount)}</span> <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}{entry.deletedAt ? ' (removed)' : entry.needsReview ? ' (period needs review)' : ''}</span>
                 </span>
+                {!entry.deletedAt && <UsageEditor entry={entry} onSaved={() => { setHistory(null); onUsageUpdate(perk.id, 0) }} />}
                 <button
                   onClick={() => deleteUsage(entry)}
                   disabled={isSaving}

@@ -8,6 +8,8 @@ export const perkSchema = z.object({
   periodType: z.string(), periodStart: z.string(), periodEnd: z.string().nullable(), startDate: z.string().nullable().optional(), endDate: z.string().nullable().optional(),
   available: z.boolean(), availableValue: z.number().finite(), needsReview: z.boolean(), valueKind: z.string(),
   enrollmentRequired: z.boolean(), category: z.string().nullable().optional(), card: cardIdentity,
+  periodValue: z.number().nullable().optional(), decemberBonus: z.number().optional(), sourceUrl: z.string().nullable().optional(), verifiedAt: z.string().nullable().optional(),
+  faceValue: z.number().optional(),
 })
 export const cardsSchema = z.array(cardIdentity.extend({
   annualFee: z.number().finite(), perks: z.array(perkSchema),

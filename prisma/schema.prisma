@@ -146,3 +146,12 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id])
 }
+
+model PerkRevision {
+  id String @id @default(cuid())
+  perkId String
+  userId String
+  data Json
+  createdAt DateTime @default(now())
+  @@index([perkId, createdAt])
+}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { loadEnvConfig } from '@next/env'
 import { prisma } from '../lib/prisma'
-import { createUsage, changeUsage } from '../lib/usage-service'
+import { createUsage, changeUsage, editUsage } from '../lib/usage-service'
 import { importUsage } from '../lib/import-usage'
 
 test('ledger serializes concurrent writes, deduplicates retries and restores safely', { skip: process.env.RUN_DB_TESTS !== '1' }, async () => {
@@ -36,6 +36,9 @@ test('ledger serializes concurrent writes, deduplicates retries and restores saf
     await importUsage(user, rows, true)
     assert.equal((await importUsage(user, rows, true)).plans.length, 0)
     assert.equal(await prisma.usage.count({ where: { userId: user.id } }), 2)
+    const imported = await prisma.usage.findFirstOrThrow({ where: { userId: user.id, needsReview: true } })
+    await editUsage(user, { id: imported.id, amount: 30, date: imported.date.toISOString().slice(0, 10) })
+    assert.equal((await prisma.usage.findUniqueOrThrow({ where: { id: imported.id } })).needsReview, false)
   } finally {
     await prisma.$transaction([
       prisma.usage.deleteMany({ where: { userId: user.id } }),

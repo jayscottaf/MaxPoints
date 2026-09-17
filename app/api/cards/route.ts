@@ -2,6 +2,7 @@ import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calendarYear, summarizePerk } from '@/lib/accounting'
+import { z } from 'zod'
 
 async function handleGET(request: NextRequest) {
   try {
@@ -40,9 +41,11 @@ async function handleGET(request: NextRequest) {
 
 async function handlePOST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const parsed = z.object({ name: z.string().trim().min(1).max(200), issuer: z.string().trim().min(1).max(200), annualFee: z.number().finite().min(0).max(100000) }).strict().safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid card details.' }, { status: 400 })
+    const owner = await getOwner()
     const card = await prisma.card.create({
-      data: body
+      data: { ...parsed.data, userCards: { create: { userId: owner.id } } }
     })
     return NextResponse.json(card)
   } catch (error) {
