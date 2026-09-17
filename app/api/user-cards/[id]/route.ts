@@ -7,7 +7,7 @@ function lastDayOfExpirationMonth(value: string) {
   const year = Number(yearValue)
   const month = Number(monthValue)
 
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
     throw new Error('Expiration month must use YYYY-MM format')
   }
 
@@ -49,6 +49,13 @@ async function handlePATCH(
   try {
     const { id } = await params
     const body = await request.json()
+    let renewalDate: Date | null | undefined
+    if (body.renewalDate === null || body.renewalDate === '') renewalDate = null
+    else if (body.renewalDate !== undefined) {
+      if (typeof body.renewalDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.renewalDate)) throw new Error('Invalid renewal date')
+      renewalDate = new Date(body.renewalDate + 'T00:00:00Z')
+      if (!Number.isFinite(renewalDate.getTime()) || renewalDate.toISOString().slice(0, 10) !== body.renewalDate) throw new Error('Invalid renewal date')
+    }
 
     const owner = await getOwner()
     if (!await prisma.userCard.findFirst({ where: { id, userId: owner.id } })) {
@@ -58,8 +65,9 @@ async function handlePATCH(
     const userCard = await prisma.userCard.update({
       where: { id },
       data: {
-        renewalDate: parseCardExpirationDate(body.expirationMonth ?? body.renewalDate),
-        last4: parseLast4(body.last4),
+        expirationDate: body.expirationMonth === undefined ? undefined : parseCardExpirationDate(body.expirationMonth),
+        renewalDate,
+        last4: body.last4 === undefined ? undefined : parseLast4(body.last4),
       },
       include: {
         card: true,

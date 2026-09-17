@@ -12,8 +12,8 @@ test('private routes reject anonymous, expired, wrong-owner and cross-site reque
   process.env.OWNER_EMAIL = 'owner@example.com'
   let expired = false
   let email = 'owner@example.com'
-  prisma.session.findUnique = (async () => ({ userId: 'owner', expiresAt: new Date(Date.now() + (expired ? -1000 : 100000)) })) as typeof prisma.session.findUnique
-  prisma.user.findUnique = (async () => ({ id: 'owner', email })) as typeof prisma.user.findUnique
+  prisma.session.findUnique = (async () => ({ userId: 'owner', expiresAt: new Date(Date.now() + (expired ? -1000 : 100000)) })) as unknown as typeof prisma.session.findUnique
+  prisma.user.findUnique = (async () => ({ id: 'owner', email })) as unknown as typeof prisma.user.findUnique
   const route = withOwner(async () => NextResponse.json({ ok: true }))
   const token = newToken()
   const request = (method: string, origin?: string) => new NextRequest('https://example.com/api/usage', {

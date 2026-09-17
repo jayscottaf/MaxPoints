@@ -2,19 +2,22 @@
 
 import { CreditCard, Calendar } from 'lucide-react'
 import { formatCurrency, formatExpirationMonth, getCardBrand, isPastDateOnly } from '@/lib/utils'
+import { sumMoney } from '@/lib/accounting'
+import type { CardDetail } from '@/lib/dashboard'
 
 interface CardSummaryProps {
-  card: any
-  onSelect: (card: any) => void
+  card: CardDetail
+  onSelect: (card: CardDetail) => void
 }
 
 export function CardSummary({ card, onSelect }: CardSummaryProps) {
-  const totalMaxValue = card.perks?.reduce((sum: number, perk: any) => sum + perk.maxValue, 0) || 0
-  const totalUsed = card.perks?.reduce((sum: number, perk: any) => sum + (perk.currentUsage || 0), 0) || 0
-  const remainingValue = totalMaxValue - totalUsed
+  const valued = card.perks.filter(perk => !['coverage', 'estimate'].includes(perk.valueKind))
+  const totalMaxValue = sumMoney(valued.map(perk => perk.annualValue))
+  const totalUsed = sumMoney(valued.map(perk => perk.annualUsage))
+  const remainingValue = sumMoney(valued.map(perk => perk.availableValue))
   const netCost = card.annualFee - totalUsed
   const coveragePercent = card.annualFee > 0 ? (totalUsed / card.annualFee) * 100 : 0
-  const expirationDate = card.userCards?.[0]?.renewalDate
+  const expirationDate = card.userCards?.[0]?.expirationDate
   const last4 = card.userCards?.[0]?.last4
   const cardExpired = expirationDate ? isPastDateOnly(expirationDate) : false
   const brand = getCardBrand(card)
@@ -28,7 +31,7 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
       {/* Brand accent stripe */}
       <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${brand.gradient}`} />
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${brand.chipBg}`}>
             <CreditCard className={`h-6 w-6 ${brand.accent}`} />
@@ -72,7 +75,7 @@ export function CardSummary({ card, onSelect }: CardSummaryProps) {
           <span className="font-medium text-zinc-200">{formatCurrency(totalUsed)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-zinc-400">Remaining Value</span>
+          <span className="text-zinc-400">Available Now</span>
           <span className="font-medium text-blue-400">{formatCurrency(remainingValue)}</span>
         </div>
       </div>

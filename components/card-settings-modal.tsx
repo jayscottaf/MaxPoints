@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import type { CardDetail } from '@/lib/dashboard'
 import { CreditCard, Save } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 type CardSettingsValues = {
   expirationMonth: string
+  renewalDate: string
   last4: string
   error: string | null
   saved: boolean
@@ -13,7 +15,7 @@ type CardSettingsValues = {
 }
 
 interface CardSettingsModalProps {
-  cards: any[]
+  cards: CardDetail[]
   onClose: () => void
   onSaved: () => Promise<void>
 }
@@ -30,7 +32,7 @@ function toMonthInputValue(value: string | Date | null | undefined) {
   return value.toISOString().slice(0, 7)
 }
 
-function createInitialValues(cards: any[]) {
+function createInitialValues(cards: CardDetail[]) {
   return cards.reduce<Record<string, CardSettingsValues>>((values, card) => {
     const userCard = card.userCards?.[0]
     if (!userCard) {
@@ -38,7 +40,8 @@ function createInitialValues(cards: any[]) {
     }
 
     values[userCard.id] = {
-      expirationMonth: toMonthInputValue(userCard.renewalDate),
+      expirationMonth: toMonthInputValue(userCard.expirationDate),
+      renewalDate: userCard.renewalDate?.slice(0, 10) || '',
       last4: userCard.last4 || '',
       error: null,
       saved: false,
@@ -52,11 +55,7 @@ function createInitialValues(cards: any[]) {
 export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModalProps) {
   const [values, setValues] = useState<Record<string, CardSettingsValues>>(() => createInitialValues(cards))
 
-  useEffect(() => {
-    setValues(createInitialValues(cards))
-  }, [cards])
-
-  const updateValue = (userCardId: string, field: 'expirationMonth' | 'last4', value: string) => {
+  const updateValue = (userCardId: string, field: 'expirationMonth' | 'last4' | 'renewalDate', value: string) => {
     setValues((current) => ({
       ...current,
       [userCardId]: {
@@ -102,6 +101,7 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
         body: JSON.stringify({
           expirationMonth: current.expirationMonth || null,
           last4: current.last4 || null,
+          renewalDate: current.renewalDate || null,
         }),
       })
 
@@ -145,6 +145,7 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
 
             const cardValues = values[userCard.id] || {
               expirationMonth: '',
+              renewalDate: '',
               last4: '',
               error: null,
               saved: false,
@@ -166,7 +167,8 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_auto] gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                  <label className="block"><span className="text-sm text-zinc-400">Annual renewal date</span><input type="date" value={cardValues.renewalDate} onChange={e => updateValue(userCard.id, 'renewalDate', e.target.value)} className="mt-1 w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-white" /></label>
                   <label className="block">
                     <span className="text-sm text-zinc-400">Expiration month</span>
                     <input

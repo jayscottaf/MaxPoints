@@ -30,7 +30,7 @@ test('email code flow enforces cooldown, browser binding, attempt limit and sing
     session: { deleteMany: async () => ({}), create: async () => { sessions++; return {} } },
   }
   prisma.$transaction = (async (fn: (client: Prisma.TransactionClient) => Promise<unknown>) => fn(tx as unknown as Prisma.TransactionClient)) as typeof prisma.$transaction
-  prisma.user.findUniqueOrThrow = (async () => ({ id: 'owner' })) as typeof prisma.user.findUniqueOrThrow
+  prisma.user.findUniqueOrThrow = (async () => ({ id: 'owner' })) as unknown as typeof prisma.user.findUniqueOrThrow
   global.fetch = async (_url, options) => {
     const email = JSON.parse(String(options?.body)) as { text: string }
     code = email.text.match(/\b\d{8}\b/)![0]

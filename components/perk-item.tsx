@@ -4,11 +4,12 @@ import { useRef, useState } from 'react'
 import { Check, Clock, DollarSign, AlertTriangle, Plus, History, Trash2, Undo2 } from 'lucide-react'
 import { formatCurrency, daysUntilDateOnly, getPercentageUsed, getPerkStatus } from '@/lib/utils'
 import { calendarDate, cents } from '@/lib/accounting'
+import type { PerkDetail } from '@/lib/dashboard'
 import { getPerkTip } from '@/lib/perk-tips'
 import { toast } from 'react-hot-toast'
 
 interface PerkItemProps {
-  perk: any
+  perk: PerkDetail
   onUsageUpdate: (perkId: string, amount: number) => void
 }
 
@@ -27,6 +28,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const [history, setHistory] = useState<UsageEntry[] | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [date, setDate] = useState(calendarDate)
+  const [confirmRemoval, setConfirmRemoval] = useState<string | null>(null)
   const pending = useRef(false)
   const submission = useRef<{ body: string; key: string } | null>(null)
 
@@ -48,15 +50,16 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   }
 
   const deleteUsage = async (entry: UsageEntry) => {
-    if (!entry.deletedAt && !window.confirm(`Remove ${formatCurrency(entry.amount)} of usage for ${perk.name}? You can restore it from history.`)) return
+    if (!entry.deletedAt && confirmRemoval !== entry.id) { setConfirmRemoval(entry.id); return }
     setIsSaving(true)
     try {
       const response = await fetch(`/api/usage?id=${encodeURIComponent(entry.id)}`, entry.deletedAt ? { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: entry.id, action: 'restore' }) } : { method: 'DELETE' })
       if (!response.ok) throw new Error('Failed to delete usage')
       const updated = await response.json()
+      setConfirmRemoval(null)
       setHistory(entries => entries?.map(item => item.id === entry.id ? updated : item) ?? null)
       const date = new Date(entry.date)
-      const inPeriod = date >= new Date(perk.periodStart) && date <= new Date(perk.periodEnd)
+      const inPeriod = date >= new Date(perk.periodStart) && (!perk.periodEnd || date <= new Date(perk.periodEnd))
       onUsageUpdate(perk.id, inPeriod ? (entry.deletedAt ? entry.amount : -entry.amount) : 0)
       toast.success(entry.deletedAt ? 'Usage restored' : 'Usage removed. Restore it from history.')
     } catch {
@@ -227,12 +230,14 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                 <button
                   onClick={() => deleteUsage(entry)}
                   disabled={isSaving}
-                  title={entry.deletedAt ? 'Restore usage' : 'Remove usage'}
-                  aria-label={`${entry.deletedAt ? 'Restore' : 'Remove'} ${formatCurrency(entry.amount)} usage`}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-zinc-400 hover:bg-red-950 hover:text-red-300 disabled:opacity-60"
+                  title={entry.deletedAt ? 'Restore usage' : confirmRemoval === entry.id ? 'Confirm removal' : 'Remove usage'}
+                  aria-label={confirmRemoval === entry.id ? 'Confirm removal' : `${entry.deletedAt ? 'Restore' : 'Remove'} ${formatCurrency(entry.amount)} usage`}
+                  className="flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-1 rounded px-2 text-zinc-400 hover:bg-red-950 hover:text-red-300 disabled:opacity-60"
                 >
                   {entry.deletedAt ? <Undo2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                  {confirmRemoval === entry.id && 'Remove'}
                 </button>
+                {confirmRemoval === entry.id && <button onClick={() => setConfirmRemoval(null)} className="text-zinc-400">Cancel</button>}
               </li>
             ))}
           </ul>

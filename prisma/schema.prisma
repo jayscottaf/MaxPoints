@@ -64,6 +64,7 @@ model UserCard {
   userId      String
   cardId      String
   renewalDate DateTime?
+  expirationDate DateTime?
   last4       String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
