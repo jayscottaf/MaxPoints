@@ -48,6 +48,7 @@ export function summarizePerk<T extends PerkTerms & { usage: UsageValue[] }>(per
   const available = today >= range.start && today <= range.end
   const remaining = Math.max(0, Math.min(cents(maxValue) - cents(currentUsage), cents(perk.maxValue) - cents(annualUsage))) / 100
   const { usage: _usage, ...terms } = perk
+  void _usage
   return { ...terms, maxValue, annualValue: perk.maxValue, currentUsage, annualUsage, periodStart: range.start.toISOString(), periodEnd: perk.periodType === 'one-time' && !perk.endDate ? null : range.end.toISOString(), available, availableValue: available && perk.valueKind !== 'coverage' && perk.valueKind !== 'estimate' ? remaining : 0, needsReview: active.some(u => u.needsReview), valueKind: perk.valueKind ?? 'credit' }
 }
 

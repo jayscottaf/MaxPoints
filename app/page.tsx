@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CardSummary } from '@/components/card-summary'
 import { CardSettingsModal } from '@/components/card-settings-modal'
 import { PerkItem } from '@/components/perk-item'
@@ -61,6 +62,7 @@ function getDueUrgency(daysLeft: number, isOneTime: boolean) {
 }
 
 export default function Dashboard() {
+  const router = useRouter()
   const [cards, setCards] = useState<CardDetail[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [year, setYear] = useState(calendarYear)
@@ -79,7 +81,7 @@ export default function Dashboard() {
     requestController.current = controller
     try {
       const response = await fetch(`/api/cards?year=${year}`, { signal: controller.signal, cache: 'no-store' })
-      if (response.status === 401) { window.location.assign('/login'); return }
+      if (response.status === 401) { router.replace('/login'); router.refresh(); return }
       if (!response.ok) throw new Error('Could not load your cards. Please retry.')
       const data = cardsSchema.safeParse(await response.json())
       if (!data.success) throw new Error('The server returned incomplete card data. Please retry.')
@@ -89,7 +91,7 @@ export default function Dashboard() {
     } finally {
       if (!controller.signal.aborted) setLoading(false)
     }
-  }, [year])
+  }, [year, router])
   useEffect(() => { void fetchDashboardData(); return () => requestController.current?.abort() }, [fetchDashboardData])
   const handleUsageUpdate = () => { void fetchDashboardData() }
 
@@ -121,7 +123,7 @@ export default function Dashboard() {
             <Bell className="h-5 w-5" />
             <span>Settings</span>
           </button>
-          <button title="Sign out" aria-label="Sign out" onClick={async () => { const response = await fetch('/api/auth', { method: 'DELETE' }); if (response.ok) window.location.assign('/login'); else setError('Could not sign out. Please retry.') }} className="rounded p-2 text-zinc-300 hover:bg-zinc-800"><LogOut className="h-5 w-5" /></button>
+          <button title="Sign out" aria-label="Sign out" onClick={async () => { const response = await fetch('/api/auth', { method: 'DELETE' }); if (response.ok) { router.replace('/login'); router.refresh() } else setError('Could not sign out. Please retry.') }} className="rounded p-2 text-zinc-300 hover:bg-zinc-800"><LogOut className="h-5 w-5" /></button>
           </div>
         </div>
       </div>

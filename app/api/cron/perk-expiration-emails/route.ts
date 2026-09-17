@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, getPeriodDates, getReminderDaysForPeriodType } from '@/lib/utils'
+import { formatCurrency, getReminderDaysForPeriodType } from '@/lib/utils'
 import { getPerkTip } from '@/lib/perk-tips'
 import { PerkExpirationEmailItem, sendPerkExpirationEmail } from '@/lib/email'
 import { periodRange, periodLimit } from '@/lib/accounting'

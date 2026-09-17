@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { loadEnvConfig } from '@next/env'
 import { prisma } from '../lib/prisma'
 import { createUsage, changeUsage } from '../lib/usage-service'
+import { importUsage } from '../lib/import-usage'
 
 test('ledger serializes concurrent writes, deduplicates retries and restores safely', { skip: process.env.RUN_DB_TESTS !== '1' }, async () => {
   loadEnvConfig(process.cwd())
@@ -26,6 +27,15 @@ test('ledger serializes concurrent writes, deduplicates retries and restores saf
     assert.equal((await prisma.usage.findUniqueOrThrow({ where: { id: entry.id } })).deletedAt, null)
     await assert.rejects(createUsage(user, { ...a, amount: 31, idempotencyKey: randomUUID() }))
     await assert.rejects(changeUsage({ ...user, id: 'not-owner' }, entry.id, 'delete'))
+    const rows = [{ card: card.name, perk: perk.name, amount: 100 }]
+    const preview = await importUsage(user, rows, false)
+    assert.equal(preview.plans[0].amount, 30)
+    assert.equal(await prisma.usage.count({ where: { userId: user.id } }), 1)
+    await assert.rejects(importUsage(user, [...rows, { ...rows[0], perk: 'Unknown' }], true))
+    assert.equal(await prisma.usage.count({ where: { userId: user.id } }), 1)
+    await importUsage(user, rows, true)
+    assert.equal((await importUsage(user, rows, true)).plans.length, 0)
+    assert.equal(await prisma.usage.count({ where: { userId: user.id } }), 2)
   } finally {
     await prisma.$transaction([
       prisma.usage.deleteMany({ where: { userId: user.id } }),

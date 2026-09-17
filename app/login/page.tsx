@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 
 export default function Login() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
@@ -17,7 +19,7 @@ export default function Login() {
       const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, ...(sent ? { code } : {}) }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
-      if (data.signedIn) window.location.assign('/')
+      if (data.signedIn) { router.replace('/'); router.refresh() }
       else setSent(true)
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not sign in.') }
     finally { setBusy(false) }

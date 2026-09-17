@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { CardDetail } from '@/lib/dashboard'
 import { CreditCard, Save } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { ImportUsage } from '@/components/import-usage'
 
 type CardSettingsValues = {
   expirationMonth: string
@@ -207,6 +208,7 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
               </section>
             )
           })}
+          <ImportUsage onSaved={onSaved} />
         </div>
       </DialogContent>
     </Dialog>
