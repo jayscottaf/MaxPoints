@@ -6,6 +6,7 @@ import { CreditCard, Save } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { ImportUsage } from '@/components/import-usage'
 import { NotificationSettings } from '@/components/notification-settings'
+import { Suggestions } from '@/components/suggestions'
 
 type CardSettingsValues = {
   expirationMonth: string
@@ -211,6 +212,7 @@ export function CardSettingsModal({ cards, onClose, onSaved }: CardSettingsModal
           })}
           <ImportUsage onSaved={onSaved} />
           <NotificationSettings />
+          <Suggestions />
         </div>
       </DialogContent>
     </Dialog>

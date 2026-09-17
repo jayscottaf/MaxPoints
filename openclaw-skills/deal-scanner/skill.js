@@ -5,9 +5,9 @@
 
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { queueSuggestion, eventId } = require('../client');
 
 // Configuration
-const MAXPOINTS_API = process.env.MAXPOINTS_API_URL || 'http://localhost:3000/api';
 const DEAL_SOURCES = [
   {
     name: 'Doctor of Credit',
@@ -35,9 +35,10 @@ const CARD_KEYWORDS = [
 
 async function fetchDeals(source) {
   try {
-    const response = await axios.get(source.url);
+    const response = await axios.get(source.url, { timeout: 15000, maxContentLength: 2000000 });
     const $ = cheerio.load(response.data);
     const deals = [];
+    if (!$(source.selector).length) throw new Error(`No matching content on ${source.name}; source selector needs review.`);
 
     $(source.selector).each((index, element) => {
       const title = $(element).text().toLowerCase();
@@ -46,10 +47,12 @@ async function fetchDeals(source) {
       // Check if deal is relevant to our tracked cards
       const isRelevant = CARD_KEYWORDS.some(keyword => title.includes(keyword));
 
-      if (isRelevant) {
+      if (isRelevant && href) {
+        const url = new URL(href, source.url);
+        if (url.protocol !== 'https:') return;
         deals.push({
           title: $(element).text(),
-          url: href,
+          url: url.href,
           source: source.name,
           foundAt: new Date()
         });
@@ -59,7 +62,7 @@ async function fetchDeals(source) {
     return deals;
   } catch (error) {
     console.error(`Error fetching from ${source.name}:`, error.message);
-    return [];
+    throw error;
   }
 }
 
@@ -78,13 +81,11 @@ async function checkForNewDeals() {
   // Send to MaxPoints API
   if (allDeals.length > 0) {
     try {
-      await axios.post(`${MAXPOINTS_API}/deals/process`, {
-        deals: allDeals,
-        timestamp: new Date()
-      });
+      for (const deal of allDeals.slice(0, 50)) await queueSuggestion({ kind: 'deal', title: deal.title.trim().slice(0, 200), message: `Potential offer from ${deal.source}. Verify the current terms before use.`, sourceUrl: deal.url, eventId: eventId(`deal:${deal.url}`) });
       console.log('Deals sent to MaxPoints');
     } catch (error) {
       console.error('Failed to send deals:', error.message);
+      throw error;
     }
   }
 

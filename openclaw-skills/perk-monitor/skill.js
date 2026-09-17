@@ -1,137 +1,44 @@
-/**
- * MaxPoints Perk Monitor Skill for OpenClaw
- * Monitors card benefits pages for changes
- */
-
 const axios = require('axios');
 const cheerio = require('cheerio');
-const crypto = require('crypto');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { queueSuggestion, eventId } = require('../client');
 
-// Configuration
-const MAXPOINTS_API = process.env.MAXPOINTS_API_URL || 'http://localhost:3000/api';
-
-// Card benefit pages to monitor
-const CARD_PAGES = [
-  {
-    cardId: 'amex-platinum',
-    name: 'Amex Platinum',
-    url: 'https://www.americanexpress.com/us/credit-cards/card/platinum/',
-    benefitsSelector: '.benefits-list'
-  },
-  {
-    cardId: 'amex-hilton-aspire',
-    name: 'Amex Hilton Aspire',
-    url: 'https://www.americanexpress.com/us/credit-cards/card/hilton-honors-aspire/',
-    benefitsSelector: '.card-benefits'
-  },
-  {
-    cardId: 'chase-reserve',
-    name: 'Chase Sapphire Reserve',
-    url: 'https://creditcards.chase.com/rewards-credit-cards/sapphire/reserve',
-    benefitsSelector: '.benefit-details'
-  }
+const pages = [
+  { name: 'Amex Platinum', url: 'https://www.americanexpress.com/us/credit-cards/card/platinum/', selector: '.benefits-list' },
+  { name: 'Amex Hilton Aspire', url: 'https://www.americanexpress.com/us/credit-cards/card/hilton-honors-aspire/', selector: '.card-benefits' },
+  { name: 'Chase Sapphire Reserve', url: 'https://creditcards.chase.com/rewards-credit-cards/sapphire/reserve', selector: '.benefit-details' }
 ];
 
-// Store hashes of benefit pages to detect changes
-let benefitHashes = {};
-
-async function fetchBenefits(card) {
-  try {
-    const response = await axios.get(card.url);
-    const $ = cheerio.load(response.data);
-
-    // Extract benefits text
-    const benefitsText = $(card.benefitsSelector).text()
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Create hash of benefits content
-    const hash = crypto.createHash('md5')
-      .update(benefitsText)
-      .digest('hex');
-
-    return {
-      cardId: card.cardId,
-      cardName: card.name,
-      content: benefitsText,
-      hash: hash,
-      url: card.url
-    };
-  } catch (error) {
-    console.error(`Error fetching benefits for ${card.name}:`, error.message);
-    return null;
-  }
-}
-
-async function checkForChanges() {
-  console.log('Checking for benefit changes...');
-  const changes = [];
-
-  for (const card of CARD_PAGES) {
-    const benefits = await fetchBenefits(card);
-
-    if (!benefits) continue;
-
-    // Check if benefits have changed
-    const previousHash = benefitHashes[card.cardId];
-    if (previousHash && previousHash !== benefits.hash) {
-      changes.push({
-        cardId: card.cardId,
-        cardName: card.name,
-        url: card.url,
-        detectedAt: new Date()
-      });
-      console.log(`Changes detected for ${card.name}`);
-    }
-
-    // Update stored hash
-    benefitHashes[card.cardId] = benefits.hash;
-  }
-
-  return changes;
-}
-
-async function notifyChanges(changes) {
-  if (changes.length === 0) return;
-
-  try {
-    // Send to MaxPoints API
-    await axios.post(`${MAXPOINTS_API}/perks/changes`, {
-      changes: changes,
-      timestamp: new Date()
-    });
-
-    console.log('Changes reported to MaxPoints');
-  } catch (error) {
-    console.error('Failed to report changes:', error.message);
-  }
-}
-
-// OpenClaw skill interface
 module.exports = {
   name: 'maxpoints-perk-monitor',
-  description: 'Monitors credit card benefits for changes',
-
-  // Run this skill
+  description: 'Queue benefit-page changes for owner review',
+  schedule: '0 8 * * 0',
   async run(context) {
-    const changes = await checkForChanges();
-
-    if (changes.length > 0) {
-      const message = `⚠️ Credit card benefits have changed:\n` +
-        changes.map(c => `• ${c.cardName} - Check: ${c.url}`).join('\n');
-
-      // Send notification through OpenClaw
-      await context.notify(message);
-
-      // Report to MaxPoints API
-      await notifyChanges(changes);
-    } else {
-      console.log('No benefit changes detected');
+    const stateFile = process.env.MAXPOINTS_MONITOR_STATE;
+    if (!stateFile) throw new Error('Set MAXPOINTS_MONITOR_STATE to a persistent JSON file path.');
+    let hashes = {};
+    try { hashes = JSON.parse(await fs.readFile(stateFile, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const next = { ...hashes };
+    let changes = 0;
+    for (const page of pages) {
+      const response = await axios.get(page.url, { timeout: 15000, maxContentLength: 2000000 });
+      const $ = cheerio.load(response.data);
+      const content = $(page.selector).text().replace(/\s+/g, ' ').trim();
+      if (content.length < 80) throw new Error(`Benefit content missing for ${page.name}; review the source selector.`);
+      const hash = eventId(content);
+      if (hashes[page.url] && hashes[page.url] !== hash) {
+        await queueSuggestion({ kind: 'benefit-change', title: `${page.name} benefit page changed`, message: 'Source content changed. Review official terms before updating the benefit catalog.', sourceUrl: page.url, eventId: eventId(`${page.url}:${hash}`) });
+        changes++;
+      }
+      next[page.url] = hash;
     }
-
-    return { success: true, changesDetected: changes.length };
-  },
-
-  // Schedule configuration (run weekly on Sundays at 8am)
-  schedule: '0 8 * * 0'
+    // Advance the durable baseline only after every source and queue request succeeds.
+    await fs.mkdir(path.dirname(stateFile), { recursive: true });
+    const temporary = `${stateFile}.${process.pid}.tmp`;
+    await fs.writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
+    await fs.rename(temporary, stateFile);
+    if (changes) await context.notify(`${changes} benefit changes queued for review in MaxPoints.`);
+    return { success: true, changesDetected: changes };
+  }
 };
