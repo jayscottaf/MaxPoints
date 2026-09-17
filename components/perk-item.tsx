@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Check, Clock, DollarSign, AlertTriangle, Plus, History, Trash2 } from 'lucide-react'
-import { formatCurrency, daysUntil, getPercentageUsed, getPerkStatus } from '@/lib/utils'
+import { useRef, useState } from 'react'
+import { Check, Clock, DollarSign, AlertTriangle, Plus, History, Trash2, Undo2 } from 'lucide-react'
+import { formatCurrency, daysUntilDateOnly, getPercentageUsed, getPerkStatus } from '@/lib/utils'
+import { calendarDate, cents } from '@/lib/accounting'
 import { getPerkTip } from '@/lib/perk-tips'
 import { toast } from 'react-hot-toast'
 
@@ -15,6 +16,8 @@ interface UsageEntry {
   id: string
   amount: number
   date: string
+  deletedAt?: string | null
+  needsReview?: boolean
 }
 
 export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
@@ -23,6 +26,9 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [history, setHistory] = useState<UsageEntry[] | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [date, setDate] = useState(calendarDate)
+  const pending = useRef(false)
+  const submission = useRef<{ body: string; key: string } | null>(null)
 
   const toggleHistory = async () => {
     if (history !== null) {
@@ -31,7 +37,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
     }
     setIsLoadingHistory(true)
     try {
-      const response = await fetch(`/api/usage?perkId=${encodeURIComponent(perk.id)}`)
+      const response = await fetch(`/api/usage?perkId=${encodeURIComponent(perk.id)}&includeDeleted=1`)
       if (!response.ok) throw new Error('Failed to load usage')
       setHistory(await response.json())
     } catch {
@@ -42,16 +48,17 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   }
 
   const deleteUsage = async (entry: UsageEntry) => {
-    if (!window.confirm(`Delete ${formatCurrency(entry.amount)} of usage for ${perk.name}?`)) return
+    if (!entry.deletedAt && !window.confirm(`Remove ${formatCurrency(entry.amount)} of usage for ${perk.name}? You can restore it from history.`)) return
     setIsSaving(true)
     try {
-      const response = await fetch(`/api/usage?id=${encodeURIComponent(entry.id)}`, { method: 'DELETE' })
+      const response = await fetch(`/api/usage?id=${encodeURIComponent(entry.id)}`, entry.deletedAt ? { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: entry.id, action: 'restore' }) } : { method: 'DELETE' })
       if (!response.ok) throw new Error('Failed to delete usage')
-      setHistory(entries => entries?.filter(item => item.id !== entry.id) ?? null)
+      const updated = await response.json()
+      setHistory(entries => entries?.map(item => item.id === entry.id ? updated : item) ?? null)
       const date = new Date(entry.date)
       const inPeriod = date >= new Date(perk.periodStart) && date <= new Date(perk.periodEnd)
-      onUsageUpdate(perk.id, inPeriod ? -entry.amount : 0)
-      toast.success('Usage deleted')
+      onUsageUpdate(perk.id, inPeriod ? (entry.deletedAt ? entry.amount : -entry.amount) : 0)
+      toast.success(entry.deletedAt ? 'Usage restored' : 'Usage removed. Restore it from history.')
     } catch {
       toast.error('Could not delete usage. Please try again.')
     } finally {
@@ -62,12 +69,13 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const currentUsage = perk.currentUsage || 0
   const percentUsed = getPercentageUsed(currentUsage, perk.maxValue)
   const status = getPerkStatus(perk, currentUsage)
-  const daysRemaining = perk.periodEnd ? daysUntil(perk.periodEnd) : null
-  const remainingValue = perk.maxValue - currentUsage
+  const daysRemaining = perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null
+  const remainingValue = Math.max(0, cents(perk.maxValue) - cents(currentUsage)) / 100
   const tip = status !== 'completed' ? getPerkTip(perk.cardId, perk.name) : null
 
   // Core submit shared by the one-tap "Used it" button and the manual entry.
   const submitUsage = async (usageAmount: number) => {
+    if (pending.current) return
     if (!Number.isFinite(usageAmount) || usageAmount <= 0) {
       toast.error('Please enter a valid amount')
       return
@@ -78,14 +86,19 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       return
     }
 
+    pending.current = true
     setIsSaving(true)
     try {
+      const body = JSON.stringify({ perkId: perk.id, amount: usageAmount, date })
+      if (submission.current?.body !== body) submission.current = { body, key: crypto.randomUUID() }
       const response = await fetch('/api/usage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           perkId: perk.id,
-          amount: usageAmount
+          amount: usageAmount,
+          date,
+          idempotencyKey: submission.current.key,
         })
       })
 
@@ -95,13 +108,15 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         setAmount('')
         setIsLogging(false)
         setHistory(null)
+        submission.current = null
       } else {
         const error = await response.json()
         toast.error(error.error || 'Failed to log usage')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to log usage')
     } finally {
+      pending.current = false
       setIsSaving(false)
     }
   }
@@ -162,7 +177,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                   {perk.category}
                 </span>
               )}
-              {daysRemaining !== null && daysRemaining <= 30 && (
+              {daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 30 && (
                 <span className="text-xs px-2 py-1 rounded-full bg-orange-900/50 text-orange-300">
                   {daysRemaining} days left
                 </span>
@@ -207,46 +222,48 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             {history.map(entry => (
               <li key={entry.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="text-zinc-300">
-                  {formatCurrency(entry.amount)} <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+                  <span className={entry.deletedAt ? 'line-through' : ''}>{formatCurrency(entry.amount)}</span> <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}{entry.deletedAt ? ' (removed)' : entry.needsReview ? ' (period needs review)' : ''}</span>
                 </span>
                 <button
                   onClick={() => deleteUsage(entry)}
                   disabled={isSaving}
-                  title="Delete usage"
-                  aria-label={`Delete ${formatCurrency(entry.amount)} usage from ${new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}`}
+                  title={entry.deletedAt ? 'Restore usage' : 'Remove usage'}
+                  aria-label={`${entry.deletedAt ? 'Restore' : 'Remove'} ${formatCurrency(entry.amount)} usage`}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-zinc-400 hover:bg-red-950 hover:text-red-300 disabled:opacity-60"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {entry.deletedAt ? <Undo2 className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                 </button>
               </li>
             ))}
           </ul>
         )}
 
-        {status !== 'completed' && (
+        {perk.needsReview && <p className="text-sm text-amber-300">Historical usage needs period review.</p>}
+        {status !== 'completed' && status !== 'upcoming' && (
           <div>
             {!isLogging ? (
               <div className="flex flex-wrap items-center gap-2">
                 {/* One-tap: most credits are all-or-nothing, so log the full remainder. */}
-                <button
+                {status !== 'expired' && <button
                   onClick={handleMarkFullyUsed}
                   disabled={isSaving}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Check className="h-4 w-4" />
                   <span>Used it{remainingValue > 0 ? ` (${formatCurrency(remainingValue)})` : ''}</span>
-                </button>
+                </button>}
                 <button
                   onClick={() => setIsLogging(true)}
                   disabled={isSaving}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 disabled:opacity-60"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Log partial</span>
+                  <span>{status === 'expired' ? 'Log past usage' : 'Log partial'}</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <input type="date" aria-label="Usage date" value={date} max={calendarDate()} onChange={e => setDate(e.target.value)} className="min-w-0 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-white" />
                 <input
                   type="number"
                   value={amount}
@@ -254,7 +271,8 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                   onKeyDown={(e) => e.key === 'Enter' && !isSaving && handleLogUsage()}
                   placeholder="Amount"
                   autoFocus
-                  className="px-2 py-1 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Usage amount"
+                  className="w-28 min-w-0 px-2 py-1 text-sm bg-zinc-800 border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   step="0.01"
                   min="0"
                   max={remainingValue}

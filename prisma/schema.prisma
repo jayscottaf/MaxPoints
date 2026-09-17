@@ -23,6 +23,7 @@ model User {
   cards         UserCard[]
   usage         Usage[]
   notifications Notification[]
+  sessions      Session[]
 }
 
 model LoginChallenge {
@@ -40,6 +41,7 @@ model Session {
   tokenHash String   @id
   userId    String
   expiresAt DateTime
+  user User @relation(fields: [userId], references: [id])
   @@index([expiresAt])
 }
 
@@ -79,6 +81,11 @@ model Perk {
   name               String
   description        String?
   maxValue           Float
+  periodValue        Float?
+  decemberBonus      Float     @default(0)
+  valueKind          String    @default("credit")
+  sourceUrl          String?
+  verifiedAt         DateTime?
   periodType         String // "annual", "quarterly", "semi-annual", "monthly", "one-time"
   startDate          DateTime?
   endDate            DateTime?
@@ -90,6 +97,7 @@ model Perk {
 
   card  Card    @relation(fields: [cardId], references: [id])
   usage Usage[]
+  @@index([cardId])
 }
 
 model Usage {
@@ -100,9 +108,14 @@ model Usage {
   date      DateTime @default(now())
   notes     String?
   createdAt DateTime @default(now())
+  deletedAt DateTime?
+  idempotencyKey String?
+  needsReview Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id])
   perk Perk @relation(fields: [perkId], references: [id])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, perkId, date])
 }
 
 model Deal {

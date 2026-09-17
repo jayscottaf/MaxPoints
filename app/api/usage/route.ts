@@ -1,167 +1,39 @@
-import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { withOwner, getOwner } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getPeriodDates } from '@/lib/utils'
+import { createUsage, changeUsage, UsageError } from '@/lib/usage-service'
 
-function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; periodType: string }) {
-  if (perk.startDate && perk.endDate) {
-    return { start: new Date(perk.startDate), end: new Date(perk.endDate) }
-  }
-
-  return getPeriodDates(perk.periodType)
+const inputSchema = z.object({ perkId: z.string().min(1).max(200), amount: z.number(), date: z.string().optional(), notes: z.string().max(2000).optional(), idempotencyKey: z.uuid() }).strict()
+function failure(error: unknown) {
+  const expected = error instanceof UsageError || error instanceof z.ZodError || error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('Usage date'))
+  return NextResponse.json({ error: expected && error instanceof Error ? error.message : 'Unable to save usage. Please retry.' }, { status: error instanceof UsageError ? error.status : expected ? 400 : 503 })
 }
-
-function getUsageDateForPeriod(periodRange: { start: Date; end: Date }) {
-  const now = new Date()
-
-  if (now < periodRange.start) {
-    return periodRange.start
-  }
-
-  if (now > periodRange.end) {
-    return periodRange.end
-  }
-
-  return now
-}
-
-async function handleGET(request: NextRequest) {
+export const GET = withOwner(async (request: NextRequest) => {
+  const user = await getOwner()
+  const perkId = request.nextUrl.searchParams.get('perkId')
+  return NextResponse.json(await prisma.usage.findMany({
+    where: { userId: user.id, ...(perkId ? { perkId } : {}), ...(request.nextUrl.searchParams.get('includeDeleted') === '1' ? {} : { deletedAt: null }) },
+    include: { perk: { select: { name: true, cardId: true } } }, orderBy: [{ date: 'desc' }, { createdAt: 'desc' }], take: 200,
+  }))
+})
+export const POST = withOwner(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url)
-    const perkId = searchParams.get('perkId')
-
-    const user = await getOwner()
-    if (!user) {
-      return NextResponse.json({ error: 'No user found' }, { status: 404 })
-    }
-
-    let where: any = { userId: user.id }
-    if (perkId) {
-      where.perkId = perkId
-    }
-
-    const usage = await prisma.usage.findMany({
-      where,
-      include: {
-        perk: {
-          include: {
-            card: true
-          }
-        }
-      },
-      orderBy: {
-        date: 'desc'
-      }
-    })
-
-    return NextResponse.json(usage)
-  } catch (error) {
-    console.error('Error fetching usage:', error)
-    return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 })
-  }
-}
-
-async function handlePOST(request: NextRequest) {
+    const parsed = inputSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid usage details.' }, { status: 400 })
+    return NextResponse.json(await createUsage(await getOwner(), parsed.data))
+  } catch (error) { return failure(error) }
+})
+export const DELETE = withOwner(async (request: NextRequest) => {
   try {
-    const body = await request.json()
-    const { perkId, amount, notes } = body
-    const usageAmount = Number(amount)
-
-    if (!perkId || !Number.isFinite(usageAmount) || usageAmount <= 0) {
-      return NextResponse.json({ error: 'Valid perk and amount are required' }, { status: 400 })
-    }
-
-    // Resolve the default user
-    const user = await getOwner()
-    if (!user) {
-      return NextResponse.json({ error: 'No user found' }, { status: 404 })
-    }
-    const userId = user.id
-
-    // Check if this would exceed the perk's max value
-    const perk = await prisma.perk.findUnique({
-      where: { id: perkId },
-      include: {
-        usage: {
-          where: { userId }
-        }
-      }
-    })
-
-    if (!perk) {
-      return NextResponse.json({ error: 'Perk not found' }, { status: 404 })
-    }
-
-    const periodRange = getPeriodRange(perk)
-    const currentUsage = perk.usage
-      .filter((usage) => {
-        const usageDate = new Date(usage.date)
-        return usageDate >= periodRange.start && usageDate <= periodRange.end
-      })
-      .reduce((sum, usage) => sum + usage.amount, 0)
-
-    if (currentUsage + usageAmount > perk.maxValue) {
-      return NextResponse.json({
-        error: 'Usage would exceed maximum value',
-        currentUsage,
-        maxValue: perk.maxValue,
-        attemptedAmount: usageAmount
-      }, { status: 400 })
-    }
-
-    const usage = await prisma.usage.create({
-      data: {
-        userId,
-        perkId,
-        amount: usageAmount,
-        date: getUsageDateForPeriod(periodRange),
-        notes
-      },
-      include: {
-        perk: {
-          include: {
-            card: true
-          }
-        }
-      }
-    })
-
-    return NextResponse.json(usage)
-  } catch (error) {
-    console.error('Error creating usage:', error)
-    return NextResponse.json({ error: 'Failed to create usage' }, { status: 500 })
-  }
-}
-
-async function handleDELETE(request: NextRequest) {
+    const id = request.nextUrl.searchParams.get('id')
+    if (!id) throw new UsageError('Usage ID required.')
+    return NextResponse.json(await changeUsage(await getOwner(), id, 'delete'))
+  } catch (error) { return failure(error) }
+})
+export const PATCH = withOwner(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ error: 'Usage ID required' }, { status: 400 })
-    }
-
-    const user = await getOwner()
-    if (!user) {
-      return NextResponse.json({ error: 'No user found' }, { status: 404 })
-    }
-
-    const deleted = await prisma.usage.deleteMany({
-      where: { id, userId: user.id }
-    })
-
-    if (!deleted.count) {
-      return NextResponse.json({ error: 'Usage not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting usage:', error)
-    return NextResponse.json({ error: 'Failed to delete usage' }, { status: 500 })
-  }
-}
-
-export const GET = withOwner(handleGET)
-export const POST = withOwner(handlePOST)
-export const DELETE = withOwner(handleDELETE)
+    const body = z.object({ id: z.string().min(1), action: z.literal('restore') }).strict().parse(await request.json())
+    return NextResponse.json(await changeUsage(await getOwner(), body.id, body.action))
+  } catch (error) { return failure(error) }
+})

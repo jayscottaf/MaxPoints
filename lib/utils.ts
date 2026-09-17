@@ -1,4 +1,5 @@
-import { format, differenceInDays, startOfDay, endOfDay } from 'date-fns'
+import { format, differenceInDays, endOfDay } from 'date-fns'
+import { cents } from './accounting'
 
 export function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ')
@@ -9,7 +10,7 @@ export function formatCurrency(amount: number): string {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -71,7 +72,7 @@ export function daysUntil(date: Date | string): number {
 
 export function getPercentageUsed(used: number, max: number): number {
   if (max === 0) return 0
-  return Math.round((used / max) * 100)
+  return Math.min(100, Math.max(0, cents(used) >= cents(max) ? 100 : Math.min(99, Math.round((used / max) * 100))))
 }
 
 export function getPeriodDates(periodType: string, year = new Date().getFullYear()) {
@@ -105,11 +106,11 @@ export function getPeriodDates(periodType: string, year = new Date().getFullYear
       }
 
     default:
-      return { start: now, end: now }
+      return { start: new Date(0), end: new Date('9999-12-31T23:59:59.999Z') }
   }
 }
 
-export function shouldNotifyForPerk(perk: any, usage: number, reminderDays: number[]): boolean {
+export function shouldNotifyForPerk(perk: { endDate?: Date | string | null; maxValue: number }, usage: number, reminderDays: number[]): boolean {
   if (!perk.endDate) return false
   if (usage >= perk.maxValue) return false
 
@@ -186,11 +187,12 @@ export function getCardBrand(card: { name?: string; issuer?: string }): CardBran
   return DEFAULT_BRAND
 }
 
-export function getPerkStatus(perk: any, usage: number): string {
-  const percentUsed = getPercentageUsed(usage, perk.maxValue)
-
-  if (percentUsed === 100) return 'completed'
-  if (perk.endDate && daysUntil(perk.endDate) < 7) return 'expiring'
-  if (percentUsed > 0) return 'in-progress'
+export function getPerkStatus(perk: { maxValue: number; periodStart?: string; periodEnd?: string | null; endDate?: string | null }, usage: number): string {
+  if (perk.maxValue > 0 && cents(usage) >= cents(perk.maxValue)) return 'completed'
+  const end = perk.periodEnd ?? perk.endDate
+  if (end && daysUntilDateOnly(end) < 0) return 'expired'
+  if (perk.periodStart && daysUntilDateOnly(perk.periodStart) > 0) return 'upcoming'
+  if (end && daysUntilDateOnly(end) < 7) return 'expiring'
+  if (usage > 0) return 'in-progress'
   return 'available'
 }

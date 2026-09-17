@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency, getPeriodDates, getReminderDaysForPeriodType } from '@/lib/utils'
 import { getPerkTip } from '@/lib/perk-tips'
 import { PerkExpirationEmailItem, sendPerkExpirationEmail } from '@/lib/email'
+import { periodRange, periodLimit } from '@/lib/accounting'
 
 export const runtime = 'nodejs'
 
@@ -59,11 +60,7 @@ function getAppUrl(request: NextRequest) {
 }
 
 function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; periodType: string }) {
-  if (perk.startDate && perk.endDate) {
-    return { start: new Date(perk.startDate), end: new Date(perk.endDate) }
-  }
-
-  return getPeriodDates(perk.periodType)
+  return periodRange(perk)
 }
 
 export async function GET(request: NextRequest) {
@@ -90,7 +87,7 @@ export async function GET(request: NextRequest) {
         include: {
           perks: {
             include: {
-              usage: true,
+              usage: { where: { deletedAt: null, needsReview: false } },
             },
           },
         },
@@ -148,11 +145,11 @@ export async function GET(request: NextRequest) {
       const currentUsage = perk.usage
         .filter((usage) => {
           const usageDate = new Date(usage.date)
-          return usageDate >= periodRange.start && usageDate <= periodRange.end
+          return usage.userId === userCard.userId && usageDate >= periodRange.start && usageDate <= periodRange.end
         })
         .reduce((sum, usage) => sum + usage.amount, 0)
 
-      const remainingValue = perk.maxValue - currentUsage
+      const remainingValue = periodLimit(perk, periodRange.start) - currentUsage
       if (remainingValue <= 0) {
         continue
       }

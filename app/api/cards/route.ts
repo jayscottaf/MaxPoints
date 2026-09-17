@@ -1,19 +1,13 @@
 import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getPeriodDates } from '@/lib/utils'
+import { calendarYear, summarizePerk } from '@/lib/accounting'
 
-function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; periodType: string }) {
-  if (perk.startDate && perk.endDate) {
-    return { start: new Date(perk.startDate), end: new Date(perk.endDate) }
-  }
-
-  return getPeriodDates(perk.periodType)
-}
-
-async function handleGET() {
+async function handleGET(request: NextRequest) {
   try {
     const user = await getOwner()
+    const year = Number(request.nextUrl.searchParams.get('year') || calendarYear(new Date(), user.timezone))
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return NextResponse.json({ error: 'Invalid year.' }, { status: 400 })
 
     const cards = await prisma.card.findMany({
       where: { userCards: { some: { userId: user.id, isActive: true } } },
@@ -33,15 +27,7 @@ async function handleGET() {
     const cardsWithUsage = cards.map(card => ({
       ...card,
       perks: card.perks.map(perk => {
-        const periodRange = getPeriodRange(perk)
-        const currentUsage = perk.usage
-          .filter((usage) => {
-            const usageDate = new Date(usage.date)
-            return usageDate >= periodRange.start && usageDate <= periodRange.end
-          })
-          .reduce((sum, usage) => sum + usage.amount, 0)
-
-        return { ...perk, currentUsage }
+        return { ...summarizePerk(perk, year, user.timezone), card: { id: card.id, name: card.name, issuer: card.issuer } }
       })
     }))
 
