@@ -60,13 +60,13 @@ export function BenefitRow({
         <span>{perk.card.name}</span>
       </span>
       <span className="benefit-row-period">
-        {perk.periodEnd ? formatDateOnly(perk.periodEnd) : "No fixed expiry"}
+        {perk.needsConfirmation ? "Confirm dates" : perk.periodEnd ? formatDateOnly(perk.periodEnd) : "No fixed expiry"}
         <small>{perk.periodType}</small>
       </span>
       <span
         className={`benefit-status ${perk.needsReview ? "review" : completed ? "complete" : due && days !== undefined && days !== null && days <= 14 ? "urgent" : ""}`}
       >
-        {perk.needsReview ? (
+        {perk.retired ? "Retired" : perk.needsConfirmation ? "Confirm details" : perk.valueKind === 'information' ? "Information" : perk.periodType === 'per-booking' ? "Per booking" : perk.needsReview ? (
           "Review usage"
         ) : completed ? (
           <>
@@ -84,9 +84,9 @@ export function BenefitRow({
       </span>
       <span className="benefit-row-value">
         <strong>
-          {formatCurrency(completed ? perk.currentUsage : perk.availableValue)}
+          {formatCurrency(completed ? perk.currentUsage : perk.periodType === 'per-booking' ? (perk.perUseLimit ?? perk.maxValue) : perk.availableValue)}
         </strong>
-        <small>{completed ? "used" : "available"}</small>
+        <small>{completed ? "used" : perk.periodType === 'per-booking' ? "per booking" : "available"}</small>
       </span>
       <ArrowUpRight className="row-arrow" size={17} />
     </button>

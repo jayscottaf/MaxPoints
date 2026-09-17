@@ -187,7 +187,11 @@ export function getCardBrand(card: { name?: string; issuer?: string }): CardBran
   return DEFAULT_BRAND
 }
 
-export function getPerkStatus(perk: { maxValue: number; periodStart?: string; periodEnd?: string | null; endDate?: string | null; daysRemaining?: number | null; daysUntilStart?: number }, usage: number): string {
+export function getPerkStatus(perk: { maxValue: number; periodStart?: string; periodEnd?: string | null; endDate?: string | null; daysRemaining?: number | null; daysUntilStart?: number; retired?: boolean; needsConfirmation?: boolean; valueKind?: string; periodType?: string; available?: boolean }, usage: number): string {
+  if (perk.retired) return 'retired'
+  if (perk.needsConfirmation) return 'confirmation-needed'
+  if (perk.valueKind === 'information') return 'information'
+  if (perk.periodType === 'four-year' && !perk.available && usage > 0) return 'completed'
   if (perk.maxValue > 0 && cents(usage) >= cents(perk.maxValue)) return 'completed'
   const end = perk.periodEnd ?? perk.endDate
   const days = perk.daysRemaining ?? (end ? daysUntilDateOnly(end) : null)

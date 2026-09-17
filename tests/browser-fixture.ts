@@ -29,6 +29,14 @@ async function main() {
     include: { perks: true },
   });
   const cardIds = [card.id];
+  if (process.env.TERMS_FIXTURE === '1') {
+    await prisma.perk.createMany({ data: [
+      { cardId: card.id, name: 'Retired test credit', maxValue: 50, periodType: 'annual', retired: true },
+      { cardId: card.id, name: 'Anniversary test credit', maxValue: 300, periodType: 'anniversary' },
+      { cardId: card.id, name: 'Booking test credit', maxValue: 100, perUseLimit: 100, periodType: 'per-booking' },
+      { cardId: card.id, name: 'The Edit test credit', maxValue: 500, perUseLimit: 250, periodType: 'annual' },
+    ] });
+  }
   if (process.env.DESIGN_FIXTURE === "1") {
     await prisma.card.update({
       where: { id: card.id },

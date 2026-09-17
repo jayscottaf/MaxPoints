@@ -87,6 +87,10 @@ model Perk {
   valueKind          String    @default("credit")
   sourceUrl          String?
   verifiedAt         DateTime?
+  validUntil         DateTime?
+  retired            Boolean   @default(false)
+  requiresConfirmation Boolean @default(false)
+  perUseLimit        Float?
   periodType         String // "annual", "quarterly", "semi-annual", "monthly", "one-time"
   startDate          DateTime?
   endDate            DateTime?

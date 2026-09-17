@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { benefitCorrections, CATALOG_VERSION, valueKind } from '../lib/benefit-catalog'
+import { additionalBenefits, verifiedTerms } from '../lib/verified-benefits'
 
 const raw: Record<string, Omit<Prisma.PerkCreateManyInput, 'cardId'>[]> = {
 'amex-platinum': [
@@ -123,11 +124,20 @@ const raw: Record<string, Omit<Prisma.PerkCreateManyInput, 'cardId'>[]> = {
   ],
 }
 
-export function catalogPerks(cardId: string) {
+function initialPerks(cardId: string) {
   return (raw[cardId] ?? []).flatMap(perk => {
-    if (perk.name === 'Apple TV+ & Music') return [{ ...perk, name: 'Apple TV', maxValue: 156, valueKind: 'membership', cardId }, { ...perk, name: 'Apple Music', maxValue: 132, valueKind: 'membership', cardId }]
+    if (perk.name === 'Apple TV+ & Music') return [{ ...perk, name: 'Apple TV', maxValue: 156, periodType: 'one-time', requiresConfirmation: true, valueKind: 'membership', cardId }, { ...perk, name: 'Apple Music', maxValue: 143.88, valueKind: 'membership', cardId }]
     const correction = benefitCorrections.find(c => c.cardId === cardId && c.name === perk.name)
     return [{ ...perk, cardId, valueKind: valueKind(perk.name, perk.category), ...(correction ? { periodType: correction.periodType, periodValue: correction.periodValue, sourceUrl: correction.sourceUrl, verifiedAt: new Date(CATALOG_VERSION), ...('maxValue' in correction ? { maxValue: correction.maxValue } : {}), ...('decemberBonus' in correction ? { decemberBonus: correction.decemberBonus } : {}) } : {}) }]
   })
 }
 
+export function catalogPerks(cardId: string) {
+  const entries: Prisma.PerkCreateManyInput[] = initialPerks(cardId).map(perk => ({ ...perk, ...verifiedTerms(cardId, perk.name) }))
+  for (const perk of additionalBenefits.filter(p => p.cardId === cardId)) {
+    const index = entries.findIndex(p => p.name === perk.name)
+    if (index < 0) entries.push(perk)
+    else entries[index] = { ...entries[index], ...perk }
+  }
+  return entries.filter(perk => !perk.retired)
+}

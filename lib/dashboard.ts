@@ -10,6 +10,8 @@ export const perkSchema = z.object({
   enrollmentRequired: z.boolean(), category: z.string().nullable().optional(), card: cardIdentity,
   periodValue: z.number().nullable().optional(), decemberBonus: z.number().optional(), sourceUrl: z.string().nullable().optional(), verifiedAt: z.string().nullable().optional(),
   faceValue: z.number().optional(),
+  retired: z.boolean().optional(), requiresConfirmation: z.boolean().optional(), needsConfirmation: z.boolean().optional(),
+  validUntil: z.string().nullable().optional(), perUseLimit: z.number().nullable().optional(), claimableValue: z.number().optional(),
   today: z.string().optional(), daysRemaining: z.number().nullable().optional(), daysUntilStart: z.number().optional(),
 })
 export const cardsSchema = z.array(cardIdentity.extend({

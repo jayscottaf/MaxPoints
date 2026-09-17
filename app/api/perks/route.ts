@@ -69,7 +69,7 @@ export const PATCH = withOwner(async (request: NextRequest) => {
     const before = await tx.perk.findFirst({ where: { id, card: { userCards: { some: { userId: user.id } } } } })
     if (!before) return NextResponse.json({ error: 'Perk not found.' }, { status: 404 })
     await tx.perkRevision.create({ data: { userId: user.id, perkId: id, data: JSON.parse(JSON.stringify(before)) } })
-    const perk = await tx.perk.update({ where: { id }, data: { ...input, startDate: input.startDate ? new Date(input.startDate) : null, endDate: input.endDate ? new Date(input.endDate) : null, verifiedAt: null } })
+    const perk = await tx.perk.update({ where: { id }, data: { ...input, validUntil: input.validUntil === undefined ? undefined : input.validUntil ? new Date(input.validUntil) : null, startDate: input.startDate ? new Date(input.startDate) : null, endDate: input.endDate ? new Date(input.endDate) : null, verifiedAt: null } })
     if (before.periodType !== input.periodType || before.periodValue !== input.periodValue) await tx.usage.updateMany({ where: { perkId: id, userId: user.id, deletedAt: null }, data: { needsReview: true } })
     return NextResponse.json(perk)
   })

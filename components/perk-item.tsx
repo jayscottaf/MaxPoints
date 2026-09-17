@@ -119,7 +119,8 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
     perk.daysRemaining ??
     (perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null);
   const remainingValue =
-    Math.max(0, cents(perk.maxValue) - cents(currentUsage)) / 100;
+    perk.claimableValue ?? Math.max(0, cents(perk.maxValue) - cents(currentUsage)) / 100;
+  const blocked = perk.retired || perk.needsConfirmation || (perk.periodType === 'four-year' && perk.claimableValue === 0) || ["information", "coverage", "estimate"].includes(perk.valueKind);
   const tip =
     status !== "completed" ? getPerkTip(perk.cardId, perk.name) : null;
 
@@ -131,7 +132,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
       return;
     }
 
-    if (currentUsage + usageAmount > perk.maxValue) {
+    if ((perk.periodType !== 'per-booking' && currentUsage + usageAmount > perk.maxValue) || (perk.perUseLimit != null && usageAmount > perk.perUseLimit)) {
       toast.error(
         `Amount exceeds maximum value of ${formatCurrency(perk.maxValue)}`,
       );
@@ -211,7 +212,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
     <div className="perk-detail">
       <div className="perk-balance">
         <span>
-          {status === "completed"
+          {perk.retired ? "Retired benefit" : perk.needsConfirmation ? "Details need confirmation" : perk.valueKind === 'information' ? "Informational benefit" : perk.periodType === 'per-booking' ? "Per qualifying booking" : status === "completed"
             ? "Used this period"
             : perk.available
               ? "Available this period"
@@ -219,7 +220,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         </span>
         <strong>
           {formatCurrency(
-            status === "completed"
+            perk.periodType === 'per-booking' ? perk.perUseLimit ?? perk.maxValue : status === "completed"
               ? currentUsage
               : perk.available
                 ? perk.availableValue
@@ -237,7 +238,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             {tip && <p className="tip-text">{tip}</p>}
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className={`text-xs px-2 py-1 rounded ${getStatusColor()}`}>
-                {status.replace("-", " ")}
+                {perk.retired ? 'retired' : perk.needsConfirmation ? 'confirm details' : perk.valueKind === 'information' ? 'information' : status.replace("-", " ")}
               </span>
               {perk.enrollmentRequired && (
                 <span className="text-xs px-2 py-1 rounded bg-violet-50 text-violet-700">
@@ -249,7 +250,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                   {perk.category}
                 </span>
               )}
-              {daysRemaining !== null &&
+              {!blocked && daysRemaining !== null &&
                 daysRemaining >= 0 &&
                 daysRemaining <= 30 && (
                   <span className="text-xs px-2 py-1 rounded bg-orange-50 text-orange-700">
@@ -265,13 +266,14 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
         {perk.notes && (
           <p className="text-sm text-muted whitespace-pre-wrap">{perk.notes}</p>
         )}
+        {perk.sourceUrl && <a href={perk.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-accent underline">Official benefit terms</a>}
         {perk.valueKind !== "credit" && (
           <p className="text-xs text-muted">
             {perk.valueKind === "coverage"
               ? "Insurance coverage"
               : perk.valueKind === "estimate"
                 ? "Estimated membership value"
-                : "Membership benefit"}
+                : perk.valueKind === 'information' ? 'Non-cash benefit' : "Membership benefit"}
           </p>
         )}
         <div>
@@ -380,12 +382,14 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
           </ul>
         )}
 
-        {perk.needsReview && (
+        {perk.needsConfirmation && <p className="text-sm text-amber-700">Confirm your benefit dates, eligibility and any previous usage in Benefit terms before recording new usage.</p>}
+        {perk.perUseLimit != null && !blocked && <p className="text-sm text-muted">Up to {formatCurrency(perk.perUseLimit)} per qualifying purchase. Record each purchase separately.</p>}
+        {perk.needsReview && !perk.needsConfirmation && (
           <p className="text-sm text-amber-700">
             Historical usage needs period review.
           </p>
         )}
-        {status !== "completed" && status !== "upcoming" && (
+        {!blocked && status !== "completed" && status !== "upcoming" && (
           <div>
             {!isLogging ? (
               <div className="flex flex-wrap items-center gap-2">

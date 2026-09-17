@@ -380,7 +380,7 @@ export default function Dashboard() {
                       <span>
                         {reviewCount}{" "}
                         {reviewCount === 1 ? "benefit has" : "benefits have"}{" "}
-                        historical usage to review.
+                        details or historical usage to review.
                       </span>
                       <button
                         className="text-action"

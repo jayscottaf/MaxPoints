@@ -36,6 +36,9 @@ export function PerkEditor({
           endDate: form.get("endDate") || null,
           notes: form.get("notes"),
           enrollmentRequired: form.get("enrollmentRequired") === "on",
+          requiresConfirmation: form.get("requiresConfirmation") === "on",
+          validUntil: form.get("validUntil") || null,
+          perUseLimit: form.get("perUseLimit") === "" ? null : Number(form.get("perUseLimit")),
         }),
       });
       if (!response.ok)
@@ -96,7 +99,7 @@ export function PerkEditor({
           defaultValue={perk.periodType}
           className={fieldClass}
         >
-          {["monthly", "quarterly", "semi-annual", "annual", "one-time"].map(
+          {["monthly", "quarterly", "semi-annual", "annual", "one-time", "anniversary", "per-booking", "four-year", "certificate"].map(
             (value) => (
               <option key={value}>{value}</option>
             ),
@@ -110,7 +113,7 @@ export function PerkEditor({
           defaultValue={perk.valueKind}
           className={fieldClass}
         >
-          {["credit", "membership", "coverage", "estimate"].map((value) => (
+          {["credit", "membership", "coverage", "estimate", "information"].map((value) => (
             <option key={value}>{value}</option>
           ))}
         </select>
@@ -151,6 +154,18 @@ export function PerkEditor({
           defaultChecked={perk.enrollmentRequired}
         />
         Enrollment required
+      </label>
+      <label className="sm:col-span-2">
+        Offer ends permanently
+        <input name="validUntil" type="date" defaultValue={perk.validUntil?.slice(0, 10) ?? ""} className={fieldClass} />
+      </label>
+      <label>
+        Per-purchase limit
+        <input name="perUseLimit" type="number" min="0" step="0.01" defaultValue={perk.perUseLimit ?? ""} className={fieldClass} />
+      </label>
+      <label className="flex items-center gap-2">
+        <input name="requiresConfirmation" type="checkbox" defaultChecked={perk.requiresConfirmation} />
+        Details need confirmation
       </label>
       <label className="sm:col-span-2">
         Notes

@@ -42,6 +42,7 @@ export async function importUsage(user: { id: string; timezone: string }, rows: 
       const matches = cards.flatMap(card => card.perks.filter(perk => normalize(card.name) === normalize(row.card) && normalize(perk.name) === normalize(row.perk)).map(perk => ({ card, perk })))
       if (matches.length !== 1) throw new Error(`Match exactly one existing card and perk for ${row.card}: ${row.perk}.`)
       const { card, perk } = matches[0]
+      if (perk.retired || perk.requiresConfirmation || ['coverage', 'estimate', 'information'].includes(perk.valueKind) || ['anniversary', 'per-booking', 'four-year', 'certificate'].includes(perk.periodType) || perk.perUseLimit !== null || perk.validUntil !== null) throw new Error(`${perk.name}: use dated individual usage entries for this benefit, not an annual-total import.`)
       if (seen.has(perk.id)) throw new Error(`Duplicate total for ${perk.name}. Use one total per perk.`)
       seen.add(perk.id)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id + ':' + perk.id}, 0))`

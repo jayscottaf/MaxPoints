@@ -1,8 +1,6 @@
 // Curated "how to actually use this" tips. Amex Platinum and Chase Sapphire
-// Reserve tips are verified against live official card-benefit pages
-// (chase.com, americanexpress.com) plus The Points Guy/NerdWallet/Doctor of
-// Credit/Upgraded Points (July 2026). Hilton Aspire tips are sourced from
-// those trackers but not individually re-verified against Amex's own pages.
+// Reserve and Aspire tips were reviewed against official issuer terms
+// on September 17, 2026. Account-specific eligibility still needs confirmation.
 // Static by design — no live scraping/LLM calls per email. Refresh
 // periodically alongside the benefit data in prisma/seed.ts.
 
@@ -25,25 +23,25 @@ const TIPS: Record<string, Record<string, string>> = {
     'Walmart+ Membership':
       'Enroll in the benefit first, then sign up for the monthly (not annual) Walmart+ plan with the card as payment; the credit applies automatically after that.',
     'Airline Incidental Fee Credit':
-      'Pick your airline in the Amex Benefits portal by Jan 31, then only charge incidentals (bags, seat upgrades, lounge passes) — not the ticket itself.',
+      'Select one eligible airline before purchase. Initial selection can be made any time; changes are normally allowed in January. Eligible incidental fees only: airfare and upgrades are excluded.',
     'Oura Ring Credit':
-      'Buy directly from ouraring.com with the card for an automatic credit; the membership subscription itself does not qualify.',
+      'Enroll in Amex Benefits before buying an eligible ring directly from ouraring.com. Membership subscriptions and accessories do not qualify.',
     'Equinox Credit':
-      'Pay Equinox club or Equinox+ directly with the card via platinum.equinox.com. Day passes and app-based purchases do not count.',
+      'Enroll through platinum.equinox.com, then pay eligible Equinox or Equinox+ membership charges directly. Third-party app-store purchases do not qualify.',
     'SoulCycle At-Home Bike Credit':
-      'Requires committing to a 12-month Equinox+ membership, then buy the bike at equinoxplus.com/amexbikebenefit (not in-store/app) to trigger the one-time $300 credit.',
+      'Confirm the current offer in your Amex account before purchase. Membership, merchant and transaction conditions apply.',
     'Global Entry/TSA PreCheck':
       'Pay the Global Entry fee (not just PreCheck) directly with the card — GE includes PreCheck, so it is the better value for the same credit.',
   },
   'amex-hilton-aspire': {
     'Hilton Resort Credit':
-      'Book directly with the resort (not a prepaid nonrefundable 3rd-party rate) and pay with the physical card at checkout.',
+      'Use a participating Hilton Resort. Advance Purchase/Non-Refundable rates are excluded, including direct bookings. Charge eligible dining/spa incidentals to your room and pay with Aspire.',
     'Flight Credit':
-      'Use it on a ticket, seat upgrade, or bag fee each quarter — it does not roll over, so even a small add-on beats losing it.',
+      'Use for eligible airfare purchased directly from an airline or Amex Travel. Do not rely on baggage fees or upgrades qualifying. No quarterly rollover.',
     'Hilton Dining Credit':
-      'Charge on-property restaurant, room service, or bar tabs to the card. Watch posting dates near year-end so charges land before it expires.',
+      'No standard $250 Aspire dining allowance is supported by current issuer terms. Check a personal offer before treating this as a credit.',
     'Waldorf/Conrad Credit':
-      'Book the 2-night minimum stay via the Aspire Card benefit rate on HiltonHonorsAspireCard.com; charges can take 8-12 weeks to post, so do not wait until the last weeks of the half.',
+      'Book at least two nights using the Aspire Card Benefit rate. The property applies up to $100 to eligible charges on the hotel bill at checkout, per qualifying booking.',
     'CLEAR Plus Credit':
       'Enroll or switch your existing CLEAR membership payment method to the Aspire card via the Amex benefits tile — it will not apply automatically.',
     'Stadium/Arena Concessions Credit':
@@ -69,27 +67,27 @@ const TIPS: Record<string, Record<string, string>> = {
     'Entertainment Credit':
       'Redeemable only on StubHub/viagogo — but you must activate the benefit on chase.com\'s benefits hub first; purchases made before activation do not count.',
     'DoorDash DashPass':
-      'Link the card as your default DoorDash/Caviar payment method, then activate once — it recurs automatically after that as long as the account stays active.',
+      'Activate the eligible DashPass offer by December 31, 2027. Confirm your actual complimentary membership expiry in DoorDash; do not assume indefinite renewal.',
     'DoorDash Credits':
       'Splits into a $5/mo restaurant credit and two separate $10/mo grocery/retail credits, one qualifying order each — none roll over if unused.',
     'Lyft Credit':
       'Link the card as your payment method in the Lyft app so the $10/mo auto-applies to rides — no separate opt-in page, and unused credit does not carry over.',
     'Peloton Credit':
-      "Activate once via chase.com or the Chase Mobile app's Benefits section before Peloton App or equipment charges qualify; up to $10/mo through 12/31/27.",
+      'Activate through Chase before eligible Peloton membership charges. The $10 monthly statement credit is not an equipment credit; equipment points bonuses are separate.',
     'Apple TV+ & Music':
       "Activate once via the Chase Mobile app's Card Benefits (link your Apple ID); complimentary through 6/22/2027 — enrolling suspends any existing paid Apple subscription.",
     'Global Entry/TSA PreCheck':
-      'Pay the application fee directly with this card for an instant credit — works for Global Entry, TSA PreCheck, or NEXUS, once per 4-year cycle.',
+      'Pay an eligible application fee directly with the card. Global Entry, TSA PreCheck or NEXUS share one credit per four years; allow issuer processing time.',
     'Priority Pass Select':
-      'Activates automatically on eligible accounts — physical card is mailed and digital card is set up in the Priority Pass or Chase Mobile app. Authorized users get their own membership for companion access.',
+      'Check Priority Pass membership and digital-card setup in Chase before travel. Access, guest limits, boarding-pass requirements and capacity restrictions apply.',
     'IHG One Rewards Platinum Elite Status':
       'Link your IHG One Rewards account via chase.com or the Chase Mobile app (enroll at ihg.com first if you don\'t have one) — status is not granted retroactively and can take up to 3 weeks to post.',
     'Marriott Bonvoy Gold Elite Status':
-      'Register during the annual promo window (2026: Jul 1–Sep 30) via marriott.chase.com/elite-status — it does not auto-renew, and award/3rd-party bookings don\'t count toward extending it.',
+      'This is a limited-time 2026 offer, not a recurring annual window. Register through Chase by September 30, 2026 and check qualifying-stay requirements for extension.',
     'Chase Sapphire Lounge Access':
-      'Entry requires your Priority Pass card plus a same-day boarding pass (within 3 hrs of departure), not just a tap — PHX Terminal 4 and LGA Reserve Suites require app reservations at capacity.',
+      'Check the specific lounge access rules in Chase before travel; boarding-pass, membership, guest and capacity restrictions apply.',
     '$75K Spend-Tier Perks':
-      'Spending $75K/year unlocks IHG Diamond, Hyatt Explorist, Southwest A-List, a $500 Southwest credit, and a $250 Shops at Chase credit — no dedicated tracker exists yet, so front-load big expenses if close.',
+      'Benefits require $75,000 in qualifying calendar-year spending. Confirm qualification and activation in Chase; no spend-tier credit is assumed available in this tracker.',
   },
 }
 

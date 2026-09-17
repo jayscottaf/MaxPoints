@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
-import { cents, sumMoney, periodLimit, periodRange, usageDate, validAmount } from './accounting'
+import { cents, sumMoney, periodLimit, eligibilityRange, confirmationNeeded, usageDate, validAmount } from './accounting'
 
 export class UsageError extends Error {
   constructor(message: string, public status: number = 400) { super(message) }
@@ -14,13 +14,20 @@ async function validateCapacity(tx: Prisma.TransactionClient, userId: string, pe
   const perk = await tx.perk.findFirst({ where: { id: perkId, card: { userCards: { some: { userId, isActive: true } } } } })
   if (!perk) throw new UsageError('Perk not found.', 404)
   // Ledger dates are date-only values normalized to UTC noon, already validated in the owner's timezone.
-  const range = periodRange(perk, date.getUTCFullYear(), date, 'UTC')
+  const rows = await tx.usage.findMany({ where: { userId, perkId, deletedAt: null, ...(excludeId ? { id: { not: excludeId } } : {}) } })
+  if (perk.retired || confirmationNeeded(perk) || ['coverage', 'estimate', 'information'].includes(perk.valueKind)) throw new UsageError('Confirm the benefit details before recording usage; retired and informational benefits cannot accept new usage.')
+  if (perk.perUseLimit !== null && cents(amount) > cents(perk.perUseLimit)) throw new UsageError('Amount exceeds the per-purchase limit. Record each qualifying purchase separately.')
+  const range = eligibilityRange(perk, rows, date.getUTCFullYear(), date, 'UTC')
   void timezone
   if (date < range.start || date > range.end) throw new UsageError('Usage date must fall within this perk period.')
-  const rows = await tx.usage.findMany({ where: { userId, perkId, deletedAt: null, ...(excludeId ? { id: { not: excludeId } } : {}) } })
+  if (perk.periodType === 'four-year' && rows.some(u => { const a = new Date(Math.min(+u.date, +date)); const b = Math.max(+u.date, +date); a.setUTCFullYear(a.getUTCFullYear() + 4); return b < +a })) throw new UsageError('This application-fee benefit can only be claimed once every four years.')
+  if (perk.periodType === 'per-booking') {
+    if (cents(amount) > cents(periodLimit(perk, date))) throw new UsageError('Amount exceeds the per-booking limit.')
+    return
+  }
   const used = sumMoney(rows.filter(u => !u.needsReview && u.date >= range.start && u.date <= range.end).map(u => u.amount))
   const annualUsed = sumMoney(rows.filter(u => u.date.getUTCFullYear() === date.getUTCFullYear()).map(u => u.amount))
-  if (cents(used) + cents(amount) > cents(periodLimit(perk, date)) || (perk.periodType !== 'one-time' && cents(annualUsed) + cents(amount) > cents(perk.maxValue))) throw new UsageError('Usage would exceed the remaining credit.')
+  if (cents(used) + cents(amount) > cents(periodLimit(perk, date)) || (['annual', 'monthly', 'quarterly', 'semi-annual'].includes(perk.periodType) && cents(annualUsed) + cents(amount) > cents(perk.maxValue))) throw new UsageError('Usage would exceed the remaining credit.')
 }
 
 export async function createUsage(user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }) {
@@ -44,7 +51,11 @@ export async function changeUsage(user: { id: string; timezone: string }, id: st
     if (!entry) throw new UsageError('Usage not found.', 404)
     await lock(tx, user.id, entry.perkId)
     const current = await tx.usage.findUniqueOrThrow({ where: { id: entry.id } })
-    if (action === 'restore') await validateCapacity(tx, user.id, current.perkId, current.amount, current.date, user.timezone, current.id)
+    if (action === 'restore') {
+      const perk = await tx.perk.findUniqueOrThrow({ where: { id: current.perkId } })
+      // Retired entries remain reversible history; they cannot accept new usage.
+      if (!perk.retired) await validateCapacity(tx, user.id, current.perkId, current.amount, current.date, user.timezone, current.id)
+    }
     return tx.usage.update({ where: { id }, data: { deletedAt: action === 'delete' ? new Date() : null } })
   }, { timeout: 15000 })
 }
