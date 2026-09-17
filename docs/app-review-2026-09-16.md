@@ -1,5 +1,32 @@
 # MaxPoints app review
 
+## Implementation follow-up
+
+The findings below are the original review, not the current deployment status. The subsequent tested batches address all 15 categories:
+
+- Owner-only email-code sessions, per-route authorization, ownership checks, CSRF protection, bounded input validation, and removal of public initialization routes.
+- Shared date/currency accounting, lifetime one-time usage, recurring-year handling, owner-timezone countdowns, period limits, and exclusion of insurance/estimated values from cash-credit totals.
+- One authoritative dashboard request, payload validation, error/retry states, reopenable card dialogs, partial-credit due lists, and separate renewal/expiration settings.
+- Atomic idempotent usage writes, editable history, reversible removal, and capacity validation under locks.
+- Transactional preview/confirm spreadsheet imports, safe no-op seeding on an existing catalog, versioned additive migrations, catalog source metadata and before-image revisions, and manual benefit corrections.
+- Owner-only reminders with saved preferences, availability notices, a durable daily payload, provider idempotency, and visible configuration/status.
+- A separately authenticated, bounded OpenClaw suggestion inbox. It cannot read personal records or silently mutate benefit/usage data.
+- Updated dependencies, zero npm audit advisories at verification, and focused policy, route, spreadsheet, database concurrency and browser tests.
+
+### Deployment and remaining checks
+
+Changes were tested and pushed to main in batches. Production database changes were additive; full local ledger backups were taken before benefit/date reconciliation. Apple TV remains recorded as used at $156, with the supplied June 22, 2027 end date and no automatic annual reset.
+
+Historical annual aggregates whose cadence changed are retained and marked for review, not guessed into individual months. They count toward annual totals but require actual dates/amounts before consuming a current-period balance or triggering reminders. Other unverified benefit terms remain editable; scraped content is not treated as authoritative.
+
+Real email inbox receipt and the phone sign-in flow still require the owner's check. Automated email tests use a mock sender. Vercel's sensitive email/cron values are present in production but cannot be exported by env pull, so local email delivery is not fully configured. The owner is bound to the existing account ID; the existing alert-email setting is used for login.
+
+OpenClaw has not been activated or sent credentials because its supplied admin URL is plaintext HTTP. Secure its administration channel before installing the ingest key. Scraper selectors require a live integration check and now fail visibly if content is absent.
+
+Browser verification used disposable records, including usage logging/editing/removal/restoration, benefit edits, preferences, modal reopening, year changes and desktop/mobile layouts. Card-date API persistence was verified; automated date-input interaction was inconclusive and should also be checked on the phone.
+
+---
+
 Reviewed September 16, 2026 (America/New_York), against commit e861cae plus existing local changes.
 
 ## Scope and evidence

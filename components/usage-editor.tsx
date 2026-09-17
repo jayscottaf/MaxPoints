@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Pencil } from 'lucide-react'
 import { calendarDate } from '@/lib/accounting'
 
-export function UsageEditor({ entry, onSaved }: { entry: { id: string; date: string; amount: number }; onSaved: () => void }) {
+export function UsageEditor({ entry, onSaved, today = calendarDate() }: { entry: { id: string; date: string; amount: number }; onSaved: () => void; today?: string }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -19,7 +19,7 @@ export function UsageEditor({ entry, onSaved }: { entry: { id: string; date: str
     finally { setBusy(false) }
   }}>
     <input name="amount" aria-label="Corrected amount" type="number" step="0.01" min="0.01" required defaultValue={entry.amount} className="w-24 rounded border border-zinc-600 bg-zinc-900 p-2" />
-    <input name="date" aria-label="Corrected date" type="date" max={calendarDate()} required defaultValue={entry.date.slice(0, 10)} className="min-w-0 rounded border border-zinc-600 bg-zinc-900 p-2" />
+    <input name="date" aria-label="Corrected date" type="date" max={today} required defaultValue={entry.date.slice(0, 10)} className="min-w-0 rounded border border-zinc-600 bg-zinc-900 p-2" />
     <button disabled={busy} className="rounded bg-blue-600 px-3 py-2 text-white">Save</button><button type="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
     {error && <p role="alert" className="w-full text-red-300">{error}</p>}
   </form>

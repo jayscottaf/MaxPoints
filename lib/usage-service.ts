@@ -13,7 +13,9 @@ async function lock(tx: Prisma.TransactionClient, userId: string, perkId: string
 async function validateCapacity(tx: Prisma.TransactionClient, userId: string, perkId: string, amount: number, date: Date, timezone: string, excludeId?: string) {
   const perk = await tx.perk.findFirst({ where: { id: perkId, card: { userCards: { some: { userId, isActive: true } } } } })
   if (!perk) throw new UsageError('Perk not found.', 404)
-  const range = periodRange(perk, date.getUTCFullYear(), date, timezone)
+  // Ledger dates are date-only values normalized to UTC noon, already validated in the owner's timezone.
+  const range = periodRange(perk, date.getUTCFullYear(), date, 'UTC')
+  void timezone
   if (date < range.start || date > range.end) throw new UsageError('Usage date must fall within this perk period.')
   const rows = await tx.usage.findMany({ where: { userId, perkId, deletedAt: null, ...(excludeId ? { id: { not: excludeId } } : {}) } })
   const used = sumMoney(rows.filter(u => !u.needsReview && u.date >= range.start && u.date <= range.end).map(u => u.amount))
@@ -41,7 +43,8 @@ export async function changeUsage(user: { id: string; timezone: string }, id: st
     const entry = await tx.usage.findFirst({ where: { id, userId: user.id } })
     if (!entry) throw new UsageError('Usage not found.', 404)
     await lock(tx, user.id, entry.perkId)
-    if (action === 'restore') await validateCapacity(tx, user.id, entry.perkId, entry.amount, entry.date, user.timezone, entry.id)
+    const current = await tx.usage.findUniqueOrThrow({ where: { id: entry.id } })
+    if (action === 'restore') await validateCapacity(tx, user.id, current.perkId, current.amount, current.date, user.timezone, current.id)
     return tx.usage.update({ where: { id }, data: { deletedAt: action === 'delete' ? new Date() : null } })
   }, { timeout: 15000 })
 }
@@ -53,6 +56,7 @@ export async function editUsage(user: { id: string; timezone: string }, input: {
     const entry = await tx.usage.findFirst({ where: { id: input.id, userId: user.id, deletedAt: null } })
     if (!entry) throw new UsageError('Usage not found.', 404)
     await lock(tx, user.id, entry.perkId)
+    if (!await tx.usage.findFirst({ where: { id: entry.id, deletedAt: null } })) throw new UsageError('This usage was removed. Restore it before editing.', 409)
     await validateCapacity(tx, user.id, entry.perkId, input.amount, date, user.timezone, entry.id)
     return tx.usage.update({ where: { id: entry.id }, data: { amount: input.amount, date, notes: input.notes, needsReview: false } })
   })

@@ -10,6 +10,7 @@ export const perkSchema = z.object({
   enrollmentRequired: z.boolean(), category: z.string().nullable().optional(), card: cardIdentity,
   periodValue: z.number().nullable().optional(), decemberBonus: z.number().optional(), sourceUrl: z.string().nullable().optional(), verifiedAt: z.string().nullable().optional(),
   faceValue: z.number().optional(),
+  today: z.string().optional(), daysRemaining: z.number().nullable().optional(), daysUntilStart: z.number().optional(),
 })
 export const cardsSchema = z.array(cardIdentity.extend({
   annualFee: z.number().finite(), perks: z.array(perkSchema),
@@ -18,7 +19,7 @@ export const cardsSchema = z.array(cardIdentity.extend({
 export type PerkDetail = z.infer<typeof perkSchema>
 export type CardDetail = z.infer<typeof cardsSchema>[number]
 export function upcomingPerks(perks: PerkDetail[]) {
-  return perks.map(perk => ({ ...perk, isOneTime: perk.periodType === 'one-time', daysLeft: perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : -1 }))
+  return perks.map(perk => ({ ...perk, isOneTime: perk.periodType === 'one-time', daysLeft: perk.daysRemaining ?? (perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : -1) }))
     .filter(perk => perk.availableValue > 0 && perk.daysLeft >= 0)
     .sort((a, b) => Number(a.isOneTime) - Number(b.isOneTime) || a.daysLeft - b.daysLeft || a.card.name.localeCompare(b.card.name) || a.name.localeCompare(b.name))
 }

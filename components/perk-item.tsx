@@ -29,7 +29,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [history, setHistory] = useState<UsageEntry[] | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  const [date, setDate] = useState(calendarDate)
+  const [date, setDate] = useState(() => perk.today || calendarDate())
   const [confirmRemoval, setConfirmRemoval] = useState<string | null>(null)
   const pending = useRef(false)
   const submission = useRef<{ body: string; key: string } | null>(null)
@@ -74,7 +74,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
   const currentUsage = perk.currentUsage || 0
   const percentUsed = getPercentageUsed(currentUsage, perk.maxValue)
   const status = getPerkStatus(perk, currentUsage)
-  const daysRemaining = perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null
+  const daysRemaining = perk.daysRemaining ?? (perk.periodEnd ? daysUntilDateOnly(perk.periodEnd) : null)
   const remainingValue = Math.max(0, cents(perk.maxValue) - cents(currentUsage)) / 100
   const tip = status !== 'completed' ? getPerkTip(perk.cardId, perk.name) : null
 
@@ -232,7 +232,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
                 <span className="text-zinc-300">
                   <span className={entry.deletedAt ? 'line-through' : ''}>{formatCurrency(entry.amount)}</span> <span className="text-zinc-500">{new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}{entry.deletedAt ? ' (removed)' : entry.needsReview ? ' (period needs review)' : ''}</span>
                 </span>
-                {!entry.deletedAt && <UsageEditor entry={entry} onSaved={() => { setHistory(null); onUsageUpdate(perk.id, 0) }} />}
+                {!entry.deletedAt && <UsageEditor entry={entry} today={perk.today} onSaved={() => { setHistory(null); onUsageUpdate(perk.id, 0) }} />}
                 <button
                   onClick={() => deleteUsage(entry)}
                   disabled={isSaving}
@@ -274,7 +274,7 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <input type="date" aria-label="Usage date" value={date} max={calendarDate()} onChange={e => setDate(e.target.value)} className="min-w-0 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-white" />
+                <input type="date" aria-label="Usage date" value={date} max={perk.today || calendarDate()} onChange={e => setDate(e.target.value)} className="min-w-0 rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-sm text-white" />
                 <input
                   type="number"
                   value={amount}
