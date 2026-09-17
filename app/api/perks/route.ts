@@ -1,16 +1,17 @@
+import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPeriodDates } from '@/lib/utils'
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const cardId = searchParams.get('cardId')
 
-    const user = await prisma.user.findFirst()
+    const user = await getOwner()
     const userId = user?.id
 
-    let where: any = {}
+    const where: import('@prisma/client').Prisma.PerkWhereInput = { card: { userCards: { some: { userId, isActive: true } } } }
     if (cardId) {
       where.cardId = cardId
     }
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     const perk = await prisma.perk.create({
@@ -67,3 +68,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create perk' }, { status: 500 })
   }
 }
+export const GET = withOwner(handleGET)
+export const POST = withOwner(handlePOST)

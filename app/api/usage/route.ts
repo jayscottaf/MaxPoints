@@ -1,3 +1,4 @@
+import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPeriodDates } from '@/lib/utils'
@@ -24,12 +25,12 @@ function getUsageDateForPeriod(periodRange: { start: Date; end: Date }) {
   return now
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const perkId = searchParams.get('perkId')
 
-    const user = await prisma.user.findFirst()
+    const user = await getOwner()
     if (!user) {
       return NextResponse.json({ error: 'No user found' }, { status: 404 })
     }
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     const { perkId, amount, notes } = body
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve the default user
-    const user = await prisma.user.findFirst()
+    const user = await getOwner()
     if (!user) {
       return NextResponse.json({ error: 'No user found' }, { status: 404 })
     }
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function handleDELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -141,7 +142,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Usage ID required' }, { status: 400 })
     }
 
-    const user = await prisma.user.findFirst()
+    const user = await getOwner()
     if (!user) {
       return NextResponse.json({ error: 'No user found' }, { status: 404 })
     }
@@ -160,3 +161,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete usage' }, { status: 500 })
   }
 }
+
+export const GET = withOwner(handleGET)
+export const POST = withOwner(handlePOST)
+export const DELETE = withOwner(handleDELETE)

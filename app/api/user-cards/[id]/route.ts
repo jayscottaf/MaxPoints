@@ -1,3 +1,4 @@
+import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -41,13 +42,18 @@ function parseLast4(value: unknown) {
   return value
 }
 
-export async function PATCH(
+async function handlePATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
     const body = await request.json()
+
+    const owner = await getOwner()
+    if (!await prisma.userCard.findFirst({ where: { id, userId: owner.id } })) {
+      return NextResponse.json({ error: 'Card not found' }, { status: 404 })
+    }
 
     const userCard = await prisma.userCard.update({
       where: { id },
@@ -68,3 +74,5 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status })
   }
 }
+
+export const PATCH = withOwner(handlePATCH)

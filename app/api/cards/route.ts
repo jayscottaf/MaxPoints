@@ -1,3 +1,4 @@
+import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPeriodDates } from '@/lib/utils'
@@ -10,11 +11,12 @@ function getPeriodRange(perk: { startDate: Date | null; endDate: Date | null; pe
   return getPeriodDates(perk.periodType)
 }
 
-export async function GET() {
+async function handleGET() {
   try {
-    const user = await prisma.user.findFirst()
+    const user = await getOwner()
 
     const cards = await prisma.card.findMany({
+      where: { userCards: { some: { userId: user.id, isActive: true } } },
       include: {
         perks: {
           include: {
@@ -23,7 +25,7 @@ export async function GET() {
             } : false
           }
         },
-        userCards: true
+        userCards: { where: { userId: user.id } }
       }
     })
 
@@ -50,7 +52,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     const card = await prisma.card.create({
@@ -62,3 +64,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create card' }, { status: 500 })
   }
 }
+
+export const GET = withOwner(handleGET)
+export const POST = withOwner(handlePOST)

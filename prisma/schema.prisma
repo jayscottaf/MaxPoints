@@ -25,6 +25,24 @@ model User {
   notifications Notification[]
 }
 
+model LoginChallenge {
+  email       String   @id
+  codeHash    String
+  nonce       String
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  requestedAt DateTime @default(now())
+  windowStart DateTime @default(now())
+  requests    Int      @default(0)
+}
+
+model Session {
+  tokenHash String   @id
+  userId    String
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
 model Card {
   id         String   @id @default(cuid())
   name       String

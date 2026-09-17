@@ -1,8 +1,9 @@
+import { withOwner, getOwner } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import * as XLSX from 'xlsx'
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -165,3 +166,4 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
+export const POST = withOwner(handlePOST)
