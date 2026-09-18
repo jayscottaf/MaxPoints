@@ -8,12 +8,12 @@ test('delivery retries freeze payload and concurrent runs create one notificatio
   const { deliverOnce } = await import('../lib/reminders')
   const owner = await prisma.user.create({ data: { email: `reminder-${randomUUID()}@example.invalid` } })
   const key = `test:${randomUUID()}`
-  const payload = { from: 'test@example.invalid', to: owner.email, subject: 'Fixture', text: 'Original' }
+  const payload = { from: 'test@example.invalid', to: owner.email, subject: 'Fixture', text: 'Original', html: '<h1>Original</h1>' }
   const accepted = new Map<string, string>()
   try {
     await assert.rejects(deliverOnce(key, owner.id, payload, async () => { throw new Error('Network') }))
-    const send = async (data: typeof payload, token: string) => { assert.equal(data.text, 'Original'); accepted.set(token, data.text) }
-    await Promise.all([deliverOnce(key, owner.id, { ...payload, text: 'Changed' }, send), deliverOnce(key, owner.id, payload, send)])
+    const send = async (data: { text: string; html?: string }, token: string) => { assert.equal(data.text, 'Original'); assert.equal(data.html, '<h1>Original</h1>'); accepted.set(token, data.text) }
+    await Promise.all([deliverOnce(key, owner.id, { ...payload, text: 'Changed', html: '<h1>Changed</h1>' }, send), deliverOnce(key, owner.id, payload, send)])
     assert.equal(accepted.size, 1)
     assert.equal(await prisma.notification.count({ where: { userId: owner.id } }), 1)
     assert.equal((await prisma.notification.findFirstOrThrow({ where: { userId: owner.id } })).message, 'Original')

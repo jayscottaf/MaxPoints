@@ -4,7 +4,7 @@ import { getOwner } from './auth'
 import { ownerEmail } from './auth-policy'
 import { calendarDate } from './accounting'
 import { canRetryDelivery, planReminders } from './reminder-policy'
-import { formatCurrency } from './utils'
+import { renderReminderEmail } from './reminder-email'
 
 export async function reminderPreview(now = new Date()) {
   const owner = await getOwner()
@@ -12,7 +12,7 @@ export async function reminderPreview(now = new Date()) {
   return { owner, items: planReminders(cards, owner.timezone, owner.notificationPrefs, now) }
 }
 
-type DeliveryPayload = { from: string; to: string; subject: string; text: string }
+type DeliveryPayload = { from: string; to: string; subject: string; text: string; html?: string }
 export async function deliverOnce(key: string, userId: string, payload: DeliveryPayload, send: (payload: DeliveryPayload, key: string) => Promise<void>) {
   // Persist the exact payload before contacting the provider so retries are identical.
   const delivery = await prisma.emailDelivery.upsert({ where: { key }, create: { key, userId, payload }, update: {} })
@@ -42,8 +42,8 @@ export async function runReminders(dryRun = false) {
   if (dryRun || !items.length) return { sent: false, dryRun, items }
   if (!process.env.RESEND_API_KEY || !process.env.PERK_ALERT_FROM || !ownerEmail()) throw new Error('Email configuration incomplete.')
   const key = `reminders:${owner.id}:${calendarDate(now, owner.timezone)}`
-  const text = [...items.map(item => `${item.cardName} - ${item.perkName}: ${formatCurrency(item.remainingValue)} ${item.kind === 'available' ? 'available now' : `remaining, expires in ${item.daysRemaining} days`}.`), '', `Open MaxPoints: ${process.env.NEXT_PUBLIC_APP_URL || 'https://mxpoints.vercel.app'}`].join('\n')
-  return deliverOnce(key, owner.id, { from: process.env.PERK_ALERT_FROM, to: ownerEmail(), subject: `MaxPoints: ${items.length} benefit reminders`, text }, async (payload, idempotencyKey) => {
+  const { html, text, subject } = renderReminderEmail(items, process.env.NEXT_PUBLIC_APP_URL || 'https://mxpoints.vercel.app')
+  return deliverOnce(key, owner.id, { from: process.env.PERK_ALERT_FROM, to: ownerEmail(), subject, text, html }, async (payload, idempotencyKey) => {
     const result = await new Resend(process.env.RESEND_API_KEY).emails.send(payload, { idempotencyKey })
     if (result.error || !result.data?.id) throw new Error('Email not accepted.')
   })
