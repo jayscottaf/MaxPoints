@@ -55,8 +55,10 @@ export function eligibilityRange(perk: PerkTerms, usage: UsageValue[], year = ca
       const start = new Date(new Date(last.date).toISOString().slice(0, 10) + 'T00:00:00Z')
       const next = new Date(start); next.setUTCFullYear(next.getUTCFullYear() + 4)
       if (next.toISOString().slice(0, 10) > today) return { start, end: new Date(+next - 1) }
+      return { start: next, end: new Date('9999-12-31T23:59:59.999Z') }
     }
-    return { start: new Date(today + 'T00:00:00Z'), end: new Date('9999-12-31T23:59:59.999Z') }
+    // Unknown initial eligibility is open-ended, not a new benefit every day.
+    return { start: perk.startDate ? new Date(new Date(perk.startDate).toISOString().slice(0, 10) + 'T00:00:00Z') : new Date(0), end: new Date('9999-12-31T23:59:59.999Z') }
   }
   if (perk.validUntil) range.end = new Date(Math.min(+range.end, Date.parse(new Date(perk.validUntil).toISOString().slice(0, 10) + 'T23:59:59.999Z')))
   // A lone start date is an offer's absolute launch, not a recurring window.
