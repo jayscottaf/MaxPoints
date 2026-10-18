@@ -23,10 +23,12 @@ import { PerkEditor } from "@/components/perk-editor";
 import { UsageEditor } from "@/components/usage-editor";
 import { getPerkTip } from "@/lib/perk-tips";
 import { toast } from "react-hot-toast";
+import { UseRemainder } from "@/components/use-remainder";
 
 interface PerkItemProps {
   perk: PerkDetail;
   onUsageUpdate: (perkId: string, amount: number) => void;
+  allPerks?: PerkDetail[];
 }
 
 interface UsageEntry {
@@ -37,7 +39,7 @@ interface UsageEntry {
   needsReview?: boolean;
 }
 
-export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
+export function PerkItem({ perk, onUsageUpdate, allPerks = [] }: PerkItemProps) {
   const [isLogging, setIsLogging] = useState(false);
   const [amount, setAmount] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -296,6 +298,8 @@ export function PerkItem({ perk, onUsageUpdate }: PerkItemProps) {
             />
           </div>
         </div>
+
+        <UseRemainder perk={perk} allPerks={allPerks} />
 
         <button
           onClick={toggleHistory}

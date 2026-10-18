@@ -6,6 +6,7 @@ type Settings = {
   timezone: string;
   expiring: boolean;
   available: boolean;
+  purchaseIdeas: boolean;
   reminderDays: number[] | null;
   emailConfigured: boolean;
   automationConfigured: boolean;
@@ -95,6 +96,7 @@ export function NotificationSettings() {
                     timezone: data.get("timezone"),
                     expiring: data.has("expiring"),
                     available: data.has("available"),
+                    purchaseIdeas: data.has("purchaseIdeas"),
                     reminderDays: days
                       ? days
                           .split(",")
@@ -134,6 +136,10 @@ export function NotificationSettings() {
                 Newly available benefits
               </label>
             </div>
+            <label className="flex gap-2 items-center">
+              <input name="purchaseIdeas" type="checkbox" defaultChecked={settings.purchaseIdeas} />
+              Purchase ideas for remaining credits in emails
+            </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 Timezone

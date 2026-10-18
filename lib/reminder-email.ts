@@ -1,10 +1,12 @@
 import { sumMoney } from './accounting'
 import { formatCurrency, formatDateOnly } from './utils'
+import type { RemainderPlan } from './remainder-options'
 
 export type ReminderEmailItem = {
   cardName: string; perkName: string; remainingValue: number; maxValue: number
   currentUsage: number; daysRemaining: number | null; periodEnd: string | null
   tip: string | null; sourceUrl?: string | null; kind: 'expiring' | 'available'
+  remainderOptions?: RemainderPlan | null
 }
 
 function escapeHtml(value: string) {
@@ -21,6 +23,34 @@ function deadline(item: ReminderEmailItem) {
   if (item.daysRemaining === null) return 'No fixed expiry'
   if (item.daysRemaining === 0) return 'Ends today'
   return item.daysRemaining === 1 ? '1 day left' : `${item.daysRemaining} days left`
+}
+function purchaseIdeas(item: ReminderEmailItem) {
+  const plan = item.remainderOptions
+  if (!plan || item.currentUsage <= 0 || item.remainingValue <= 0 || plan.periodEnd !== item.periodEnd || plan.remainingValue !== item.remainingValue) return null
+  const options = plan.options.filter(option => safeUrl(option.url)).slice(0, 3)
+  return options.length ? { ...plan, options } : null
+}
+function renderPurchaseIdeas(item: ReminderEmailItem) {
+  const plan = purchaseIdeas(item)
+  if (!plan) return ''
+  return `<div style="margin-top:18px;padding-top:14px;border-top:1px solid #dde5e1;">
+    <h4 style="margin:0 0 8px;color:#172f25;font-size:15px;line-height:22px;">Use the remainder</h4>
+    <p style="margin:0 0 10px;color:#56665e;font-size:13px;line-height:21px;">Up to ${formatCurrency(item.remainingValue)} toward eligible purchases. Anything above that is out of pocket.</p>
+    <p style="margin:0 0 10px;color:#56665e;font-size:13px;line-height:21px;">${escapeHtml(plan.rule)}</p>
+    ${plan.options.map(option => `<p style="margin:0 0 10px;font-size:13px;line-height:21px;"><a href="${escapeHtml(safeUrl(option.url)!)}" style="color:#236754;text-decoration:underline;font-weight:700;">${escapeHtml(option.title)}</a><br><span style="color:#56665e;">${escapeHtml(option.description)}</span></p>`).join('')}
+    ${plan.overlap ? `<p style="margin:0 0 10px;color:#56665e;font-size:12px;line-height:20px;">${escapeHtml(plan.overlap.text)}${safeUrl(plan.overlap.url) ? ` <a href="${escapeHtml(safeUrl(plan.overlap.url)!)}" style="color:#236754;text-decoration:underline;">Included streaming plans</a>` : ''}</p>` : ''}
+    <p style="margin:0;color:#56665e;font-size:12px;line-height:20px;">Only buy what you need. Check prices, renewals and existing subscriptions.${safeUrl(plan.sourceUrl) ? ` <a href="${escapeHtml(safeUrl(plan.sourceUrl)!)}" style="color:#236754;text-decoration:underline;">Eligibility checked ${escapeHtml(formatDateOnly(plan.verifiedOn))}</a>` : ''}</p>
+  </div>`
+}
+function purchaseIdeasText(item: ReminderEmailItem) {
+  const plan = purchaseIdeas(item)
+  if (!plan) return []
+  return ['Use the remainder (optional)', `Up to ${formatCurrency(item.remainingValue)} toward eligible purchases; anything above that is out of pocket.`, plan.rule,
+    ...plan.options.map(option => `${option.title}: ${option.description} ${safeUrl(option.url)}`),
+    ...(plan.overlap ? [plan.overlap.text, ...(safeUrl(plan.overlap.url) ? [`Included streaming plans: ${safeUrl(plan.overlap.url)}`] : [])] : []),
+    'Only buy what you need. Check prices, renewals and existing subscriptions.',
+    ...(safeUrl(plan.sourceUrl) ? [`Eligibility checked ${formatDateOnly(plan.verifiedOn)}: ${safeUrl(plan.sourceUrl)}`] : []),
+  ]
 }
 function renderBenefit(item: ReminderEmailItem) {
   const source = safeUrl(item.sourceUrl)
@@ -41,6 +71,7 @@ function renderBenefit(item: ReminderEmailItem) {
     </tr></table>
     ${item.tip ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border-collapse:collapse;"><tr><td style="padding:12px 14px;background:#eff5fb;border-left:3px solid #4576a3;color:#264b6b;font-size:13px;line-height:21px;"><strong>Make it count</strong><br>${escapeHtml(item.tip)}</td></tr></table>` : ''}
     ${source ? `<p style="margin:12px 0 0;font-size:12px;line-height:20px;"><a href="${escapeHtml(source)}" style="color:#236754;text-decoration:underline;">Check eligible purchases and terms</a></p>` : ''}
+    ${renderPurchaseIdeas(item)}
   </td></tr>`
 }
 
@@ -87,6 +118,7 @@ export function renderReminderEmail(items: ReminderEmailItem[], appUrl: string) 
     item.periodEnd ? `Use by ${formatDateOnly(item.periodEnd)} (${deadline(item)}).` : 'No fixed expiry.',
     ...(item.tip ? [`Tip: ${item.tip}`] : []),
     ...(safeUrl(item.sourceUrl) ? [`Terms: ${safeUrl(item.sourceUrl)}`] : []), '',
+    ...purchaseIdeasText(item), '',
   ])]), `Open MaxPoints: ${url}`, '', 'Balances reflect logged usage, not your card statement. Manage reminder preferences in MaxPoints Settings.'].join('\n')
   return { html, text, preview, subject }
 }

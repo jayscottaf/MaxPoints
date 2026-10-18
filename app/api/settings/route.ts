@@ -15,6 +15,6 @@ export const PATCH = withOwner(async request => {
   if (!input.success) return NextResponse.json({ error: 'Check timezone and reminder days (0-90).' }, { status: 400 })
   const owner = await getOwner()
   const { timezone, ...notificationPrefs } = input.data
-  await prisma.user.update({ where: { id: owner.id }, data: { timezone, notificationPrefs } })
+  await prisma.user.update({ where: { id: owner.id }, data: { timezone, notificationPrefs: { ...notificationPreferences(owner.notificationPrefs), ...notificationPrefs } } })
   return NextResponse.json({ ok: true })
 })

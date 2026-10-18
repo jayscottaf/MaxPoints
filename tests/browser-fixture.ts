@@ -6,6 +6,8 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { digest, newToken } from "../lib/auth-policy";
 import { calendarDate } from "../lib/accounting";
+import { planReminders } from "../lib/reminder-policy";
+import { renderReminderEmail } from "../lib/reminder-email";
 
 loadEnvConfig(process.cwd());
 const prisma = new PrismaClient();
@@ -30,6 +32,20 @@ async function main() {
     include: { perks: true },
   });
   const cardIds = [card.id];
+  if (process.env.REMAINDER_FIXTURE === '1') {
+    // Reuse read-only catalog terms with an isolated owner's synthetic usage.
+    for (const id of ['amex-platinum', 'chase-reserve']) {
+      await prisma.userCard.create({ data: { userId: user.id, cardId: id } });
+    }
+    for (const [cardId, name, amount] of [
+      ['amex-platinum', 'Digital Entertainment Credit', 18.99],
+      ['amex-platinum', 'Walmart+ Membership', 13.86],
+      ['chase-reserve', 'Dining Credit H2', 97.62],
+    ] as const) {
+      const perk = await prisma.perk.findFirstOrThrow({ where: { cardId, name } });
+      await prisma.usage.create({ data: { userId: user.id, perkId: perk.id, amount, date: new Date(calendarDate() + 'T12:00:00Z') } });
+    }
+  }
   if (process.env.BANK_FIXTURE === '1') {
     await prisma.card.update({ where: { id: card.id }, data: { issuer: 'American Express', name: 'Test Platinum' } });
     await prisma.bankConnection.create({ data: {
@@ -161,6 +177,16 @@ async function main() {
     },
   );
   const server = createServer((req, res) => {
+    if (process.env.REMAINDER_FIXTURE === '1' && req.url === '/remainder-email-preview') {
+      void (async () => {
+        const cards = await prisma.card.findMany({ where: { userCards: { some: { userId: user.id } } }, include: { perks: { include: { usage: { where: { userId: user.id, deletedAt: null } } } } } });
+        const items = planReminders(cards, 'America/New_York', { reminderDays: [0, 1, 3, 7, 13, 14, 30, 60, 74, 90] }).filter(item => item.remainderOptions);
+        const email = renderReminderEmail(items, 'http://localhost:3105');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(email.html);
+      })().catch(() => { res.writeHead(500); res.end('Preview failed.'); });
+      return;
+    }
     const upstream = request(
       {
         hostname: "127.0.0.1",

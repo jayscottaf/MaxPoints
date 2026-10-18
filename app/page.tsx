@@ -480,6 +480,7 @@ export default function Dashboard() {
             <PerkItem
               key={selectedPerk.id}
               perk={selectedPerk}
+              allPerks={perks}
               onUsageUpdate={updateUsage}
             />
           </DialogContent>
