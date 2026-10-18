@@ -169,3 +169,63 @@ model EmailDelivery {
   lastError String?
   @@index([userId, createdAt])
 }
+
+model BankConnection {
+  id String @id @default(cuid())
+  userId String
+  itemId String @unique
+  institutionId String
+  name String
+  environment String
+  encryptedToken String?
+  cursor String?
+  disabledAt DateTime?
+  lastSyncedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  accounts BankAccount[]
+  transactions BankTransaction[]
+  @@index([userId])
+}
+
+model BankAccount {
+  id String @id @default(cuid())
+  connectionId String
+  accountId String @unique
+  name String
+  mask String?
+  cardId String?
+  connection BankConnection @relation(fields: [connectionId], references: [id])
+  transactions BankTransaction[]
+  @@index([connectionId])
+}
+
+model BankTransaction {
+  id String @id @default(cuid())
+  connectionId String
+  accountId String
+  transactionId String @unique
+  description String
+  amountCents Int
+  date String
+  pending Boolean
+  removed Boolean @default(false)
+  currency String?
+  status String @default("unmatched")
+  candidatePerkIds String[]
+  usageId String?
+  updatedAt DateTime @updatedAt
+  connection BankConnection @relation(fields: [connectionId], references: [id])
+  account BankAccount @relation(fields: [accountId], references: [id])
+  @@index([connectionId, status])
+}
+
+model BankLinkSession {
+  id String @id @default(cuid())
+  userId String
+  encryptedToken String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}

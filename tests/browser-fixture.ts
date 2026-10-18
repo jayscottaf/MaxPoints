@@ -5,6 +5,7 @@ import { createServer, request } from "node:http";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { digest, newToken } from "../lib/auth-policy";
+import { calendarDate } from "../lib/accounting";
 
 loadEnvConfig(process.cwd());
 const prisma = new PrismaClient();
@@ -29,6 +30,15 @@ async function main() {
     include: { perks: true },
   });
   const cardIds = [card.id];
+  if (process.env.BANK_FIXTURE === '1') {
+    await prisma.card.update({ where: { id: card.id }, data: { issuer: 'American Express', name: 'Test Platinum' } });
+    await prisma.bankConnection.create({ data: {
+      userId: user.id, itemId: randomUUID(), institutionId: 'test', name: 'American Express', environment: 'sandbox',
+      accounts: { create: { accountId: randomUUID(), name: 'Test Platinum', mask: '1234', cardId: card.id } },
+    } });
+    const account = await prisma.bankAccount.findFirstOrThrow({ where: { cardId: card.id } });
+    await prisma.bankTransaction.create({ data: { connectionId: account.connectionId, accountId: account.id, transactionId: randomUUID(), description: 'AMEX DINING BENEFIT CREDIT (TEST)', amountCents: -2500, date: calendarDate(), pending: false, currency: 'USD', status: 'pending', candidatePerkIds: [card.perks[0].id] } });
+  }
   if (process.env.TERMS_FIXTURE === '1') {
     await prisma.perk.createMany({ data: [
       { cardId: card.id, name: 'Retired test credit', maxValue: 50, periodType: 'annual', retired: true },
@@ -187,6 +197,10 @@ async function main() {
     server.close();
     child.kill("SIGTERM");
     await prisma.$transaction([
+      prisma.bankTransaction.deleteMany({ where: { connection: { userId: user.id } } }),
+      prisma.bankAccount.deleteMany({ where: { connection: { userId: user.id } } }),
+      prisma.bankConnection.deleteMany({ where: { userId: user.id } }),
+      prisma.bankLinkSession.deleteMany({ where: { userId: user.id } }),
       prisma.perkRevision.deleteMany({ where: { userId: user.id } }),
       prisma.emailDelivery.deleteMany({ where: { userId: user.id } }),
       prisma.notification.deleteMany({ where: { userId: user.id } }),

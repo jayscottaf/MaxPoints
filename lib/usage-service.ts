@@ -30,19 +30,21 @@ async function validateCapacity(tx: Prisma.TransactionClient, userId: string, pe
   if (cents(used) + cents(amount) > cents(periodLimit(perk, date)) || (['annual', 'monthly', 'quarterly', 'semi-annual'].includes(perk.periodType) && cents(annualUsed) + cents(amount) > cents(perk.maxValue))) throw new UsageError('Usage would exceed the remaining credit.')
 }
 
-export async function createUsage(user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }) {
+export async function createUsageInTransaction(tx: Prisma.TransactionClient, user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }) {
   if (!validAmount(input.amount)) throw new UsageError('Amount must be positive with at most two decimal places.')
   const date = usageDate(input.date, user.timezone)
-  return prisma.$transaction(async tx => {
-    await lock(tx, user.id, input.perkId)
-    const existing = await tx.usage.findUnique({ where: { userId_idempotencyKey: { userId: user.id, idempotencyKey: input.idempotencyKey } } })
-    if (existing) {
-      if (existing.perkId !== input.perkId || cents(existing.amount) !== cents(input.amount) || existing.date.getTime() !== date.getTime() || (existing.notes ?? '') !== (input.notes ?? '')) throw new UsageError('This request key has already been used.', 409)
-      return existing
-    }
-    await validateCapacity(tx, user.id, input.perkId, input.amount, date, user.timezone)
-    return tx.usage.create({ data: { ...input, userId: user.id, date } })
-  }, { timeout: 15000 })
+  await lock(tx, user.id, input.perkId)
+  const existing = await tx.usage.findUnique({ where: { userId_idempotencyKey: { userId: user.id, idempotencyKey: input.idempotencyKey } } })
+  if (existing) {
+    if (existing.perkId !== input.perkId || cents(existing.amount) !== cents(input.amount) || existing.date.getTime() !== date.getTime() || (existing.notes ?? '') !== (input.notes ?? '')) throw new UsageError('This request key has already been used.', 409)
+    return existing
+  }
+  await validateCapacity(tx, user.id, input.perkId, input.amount, date, user.timezone)
+  return tx.usage.create({ data: { ...input, userId: user.id, date } })
+}
+
+export async function createUsage(user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }) {
+  return prisma.$transaction(tx => createUsageInTransaction(tx, user, input), { timeout: 15000 })
 }
 
 export async function changeUsage(user: { id: string; timezone: string }, id: string, action: 'delete' | 'restore') {

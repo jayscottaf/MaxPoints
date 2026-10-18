@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, History, RefreshCw } from "lucide-react";
 import { z } from "zod";
 import { formatCurrency, formatDateOnly } from "@/lib/utils";
+import { BankConnections } from "@/components/bank-connections";
 const entriesSchema = z.array(
   z.object({
     id: z.string(),
@@ -17,9 +18,11 @@ const entriesSchema = z.array(
 export function ActivityView({
   year,
   onSelect,
+  onSaved,
 }: {
   year: number;
   onSelect: (id: string) => void;
+  onSaved?: () => Promise<void>;
 }) {
   const [entries, setEntries] = useState<z.infer<typeof entriesSchema>>([]);
   const [error, setError] = useState("");
@@ -50,6 +53,7 @@ export function ActivityView({
   );
   return (
     <section className="activity-view">
+      <BankConnections reviewOnly onSaved={async () => { setRetry(value => value + 1); await onSaved?.(); }} />
       <div className="section-heading">
         <div className="segment-control">
           <button aria-pressed={!removed} onClick={() => setRemoved(false)}>

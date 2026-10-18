@@ -7,6 +7,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ImportUsage } from "@/components/import-usage";
 import { NotificationSettings } from "@/components/notification-settings";
 import { Suggestions } from "@/components/suggestions";
+import { BankConnections } from "@/components/bank-connections";
 
 type CardSettingsValues = {
   expirationMonth: string;
@@ -160,6 +161,7 @@ export function CardSettingsModal({
         >
           {[
             { id: "cards", label: "Card details" },
+            { id: "banks", label: "Banks & credits" },
             { id: "notifications", label: "Notifications" },
             { id: "import", label: "Import" },
             { id: "automation", label: "Automation" },
@@ -173,7 +175,7 @@ export function CardSettingsModal({
               id={`tab-${item.id}`}
               onClick={() => setTab(item.id)}
               onKeyDown={(event) => {
-                const ids = ["cards", "notifications", "import", "automation"];
+                const ids = ["cards", "banks", "notifications", "import", "automation"];
                 const index = ids.indexOf(tab);
                 const next =
                   event.key === "ArrowRight"
@@ -310,6 +312,7 @@ export function CardSettingsModal({
                 );
               })}
             {tab === "import" && <ImportUsage onSaved={onSaved} />}
+            {tab === "banks" && <BankConnections onSaved={onSaved} />}
             {tab === "notifications" && <NotificationSettings />}
             {tab === "automation" && <Suggestions />}
           </div>

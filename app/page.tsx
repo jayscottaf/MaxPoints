@@ -431,6 +431,7 @@ export default function Dashboard() {
                   key={activityVersion}
                   year={year}
                   onSelect={selectPerk}
+                  onSaved={fetchDashboardData}
                 />
               )}
               {!cards.length && (
