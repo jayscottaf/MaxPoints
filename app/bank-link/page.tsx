@@ -34,7 +34,11 @@ export default function BankLinkReturn() {
       ) : session ? (
         <BankLink
           session={session}
-          receivedRedirectUri={window.location.href}
+          receivedRedirectUri={
+            new URLSearchParams(window.location.search).has("oauth_state_id")
+              ? window.location.href
+              : undefined
+          }
           onDone={done}
           onError={setError}
         />

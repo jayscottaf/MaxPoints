@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { usePlaidLink } from "react-plaid-link";
+import { useRouter } from "next/navigation";
 import { Check, Link2, RefreshCw, Unplug, X, Undo2 } from "lucide-react";
 import { formatCurrency, formatDateOnly } from "@/lib/utils";
 
@@ -256,11 +257,11 @@ export function BankConnections({
   onSaved?: () => Promise<void>;
   reviewOnly?: boolean;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<BankData | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [session, setSession] = useState<LinkSession | null>(null),
-    [history, setHistory] = useState(false);
+  const [history, setHistory] = useState(false);
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/bank-connections");
@@ -293,13 +294,7 @@ export function BankConnections({
     },
     [load, onSaved],
   );
-  const done = useCallback(() => {
-    setSession(null);
-    setBusy(false);
-    void load();
-  }, [load]);
   const linkError = useCallback((message: string) => {
-    setSession(null);
     setBusy(false);
     setError(message);
   }, []);
@@ -360,7 +355,8 @@ export function BankConnections({
                         "maxpoints-bank-link",
                         JSON.stringify(next),
                       );
-                      setSession(next);
+                      // Plaid must open outside Radix's modal focus trap.
+                      router.push("/bank-link");
                     } catch (error) {
                       linkError(
                         error instanceof Error
@@ -373,9 +369,6 @@ export function BankConnections({
                   <Link2 size={16} />
                   Connect Amex or Chase
                 </button>
-              )}
-              {session && (
-                <BankLink session={session} onDone={done} onError={linkError} />
               )}
               {data.connections.map((connection) => (
                 <div
