@@ -214,6 +214,9 @@ model BankTransaction {
   status String @default("unmatched")
   candidatePerkIds String[]
   usageId String?
+  repeatEnabledAt DateTime?
+  autoApproved Boolean @default(false)
+  undoneAt DateTime?
   updatedAt DateTime @updatedAt
   connection BankConnection @relation(fields: [connectionId], references: [id])
   account BankAccount @relation(fields: [accountId], references: [id])

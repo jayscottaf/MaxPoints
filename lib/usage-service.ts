@@ -10,7 +10,7 @@ async function lock(tx: Prisma.TransactionClient, userId: string, perkId: string
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId + ':' + perkId}, 0))`
 }
 
-async function validateCapacity(tx: Prisma.TransactionClient, userId: string, perkId: string, amount: number, date: Date, timezone: string, excludeId?: string) {
+async function validateCapacity(tx: Prisma.TransactionClient, userId: string, perkId: string, amount: number, date: Date, timezone: string, excludeId?: string, bankTransactionId?: string) {
   const perk = await tx.perk.findFirst({ where: { id: perkId, card: { userCards: { some: { userId, isActive: true } } } } })
   if (!perk) throw new UsageError('Perk not found.', 404)
   // Ledger dates are date-only values normalized to UTC noon, already validated in the owner's timezone.
@@ -18,6 +18,13 @@ async function validateCapacity(tx: Prisma.TransactionClient, userId: string, pe
   if (perk.retired || confirmationNeeded(perk) || ['coverage', 'estimate', 'information'].includes(perk.valueKind)) throw new UsageError('Confirm the benefit details before recording usage; retired and informational benefits cannot accept new usage.')
   if (perk.perUseLimit !== null && cents(amount) > cents(perk.perUseLimit)) throw new UsageError('Amount exceeds the per-purchase limit. Record each qualifying purchase separately.')
   const range = eligibilityRange(perk, rows, date.getUTCFullYear(), date, 'UTC')
+  const walmart = perk.name === 'Walmart+ Membership' && perk.valueKind === 'membership' && perk.periodType === 'monthly' && perk.cardId === 'amex-platinum'
+  let includesVerifiedTax = false
+  if (walmart && bankTransactionId) {
+    const bank = await tx.bankTransaction.findFirst({ where: { id: bankTransactionId, connection: { userId, disabledAt: null }, account: { cardId: perk.cardId }, pending: false, removed: false, currency: 'USD', amountCents: -cents(amount), candidatePerkIds: { has: perkId } } })
+    includesVerifiedTax = !!bank && /walmart\s*\+|walmart plus/i.test(bank.description) && /credit|benefit|reimburse/i.test(bank.description)
+    if (includesVerifiedTax && rows.some(u => u.date >= range.start && u.date <= range.end)) throw new UsageError('A Walmart+ membership is already recorded for this month.', 409)
+  }
   void timezone
   if (date < range.start || date > range.end) throw new UsageError('Usage date must fall within this perk period.')
   if (perk.periodType === 'four-year' && rows.some(u => { const a = new Date(Math.min(+u.date, +date)); const b = Math.max(+u.date, +date); a.setUTCFullYear(a.getUTCFullYear() + 4); return b < +a })) throw new UsageError('This application-fee benefit can only be claimed once every four years.')
@@ -26,11 +33,13 @@ async function validateCapacity(tx: Prisma.TransactionClient, userId: string, pe
     return
   }
   const used = sumMoney(rows.filter(u => !u.needsReview && u.date >= range.start && u.date <= range.end).map(u => u.amount))
-  const annualUsed = sumMoney(rows.filter(u => u.date.getUTCFullYear() === date.getUTCFullYear()).map(u => u.amount))
-  if (cents(used) + cents(amount) > cents(periodLimit(perk, date)) || (['annual', 'monthly', 'quarterly', 'semi-annual'].includes(perk.periodType) && cents(annualUsed) + cents(amount) > cents(perk.maxValue))) throw new UsageError('Usage would exceed the remaining credit.')
+  // Walmart's stated allowance excludes tax; retain the actual bank reimbursement in the ledger.
+  const annualUsed = sumMoney(rows.filter(u => u.date.getUTCFullYear() === date.getUTCFullYear()).map(u => walmart ? Math.min(u.amount, periodLimit(perk, u.date)) : u.amount))
+  const budgetAmount = includesVerifiedTax ? Math.min(amount, periodLimit(perk, date)) : amount
+  if ((!includesVerifiedTax && cents(used) + cents(amount) > cents(periodLimit(perk, date))) || (['annual', 'monthly', 'quarterly', 'semi-annual'].includes(perk.periodType) && cents(annualUsed) + cents(budgetAmount) > cents(perk.maxValue))) throw new UsageError('Usage would exceed the remaining credit.')
 }
 
-export async function createUsageInTransaction(tx: Prisma.TransactionClient, user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }) {
+export async function createUsageInTransaction(tx: Prisma.TransactionClient, user: { id: string; timezone: string }, input: { perkId: string; amount: number; date?: string; notes?: string; idempotencyKey: string }, bankTransactionId?: string) {
   if (!validAmount(input.amount)) throw new UsageError('Amount must be positive with at most two decimal places.')
   const date = usageDate(input.date, user.timezone)
   await lock(tx, user.id, input.perkId)
@@ -39,7 +48,7 @@ export async function createUsageInTransaction(tx: Prisma.TransactionClient, use
     if (existing.perkId !== input.perkId || cents(existing.amount) !== cents(input.amount) || existing.date.getTime() !== date.getTime() || (existing.notes ?? '') !== (input.notes ?? '')) throw new UsageError('This request key has already been used.', 409)
     return existing
   }
-  await validateCapacity(tx, user.id, input.perkId, input.amount, date, user.timezone)
+  await validateCapacity(tx, user.id, input.perkId, input.amount, date, user.timezone, undefined, bankTransactionId)
   return tx.usage.create({ data: { ...input, userId: user.id, date } })
 }
 
@@ -56,7 +65,8 @@ export async function changeUsage(user: { id: string; timezone: string }, id: st
     if (action === 'restore') {
       const perk = await tx.perk.findUniqueOrThrow({ where: { id: current.perkId } })
       // Retired entries remain reversible history; they cannot accept new usage.
-      if (!perk.retired) await validateCapacity(tx, user.id, current.perkId, current.amount, current.date, user.timezone, current.id)
+      const bank = await tx.bankTransaction.findFirst({ where: { usageId: current.id, connection: { userId: user.id } } })
+      if (!perk.retired) await validateCapacity(tx, user.id, current.perkId, current.amount, current.date, user.timezone, current.id, bank?.id)
     }
     return tx.usage.update({ where: { id }, data: { deletedAt: action === 'delete' ? new Date() : null } })
   }, { timeout: 15000 })
@@ -70,7 +80,8 @@ export async function editUsage(user: { id: string; timezone: string }, input: {
     if (!entry) throw new UsageError('Usage not found.', 404)
     await lock(tx, user.id, entry.perkId)
     if (!await tx.usage.findFirst({ where: { id: entry.id, deletedAt: null } })) throw new UsageError('This usage was removed. Restore it before editing.', 409)
-    await validateCapacity(tx, user.id, entry.perkId, input.amount, date, user.timezone, entry.id)
+    const bank = await tx.bankTransaction.findFirst({ where: { usageId: entry.id, connection: { userId: user.id } } })
+    await validateCapacity(tx, user.id, entry.perkId, input.amount, date, user.timezone, entry.id, bank?.id)
     return tx.usage.update({ where: { id: entry.id }, data: { amount: input.amount, date, notes: input.notes, needsReview: false } })
   })
 }

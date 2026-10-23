@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { useRouter } from "next/navigation";
-import { Check, Link2, RefreshCw, Unplug, X, Undo2 } from "lucide-react";
+import { Check, Link2, RefreshCw, Unplug, X, Undo2, Pause } from "lucide-react";
 import { formatCurrency, formatDateOnly } from "@/lib/utils";
 
 type LinkSession = { sessionId: string; token: string };
@@ -14,6 +14,8 @@ type Credit = {
   status: string;
   candidatePerkIds: string[];
   usageId: string | null;
+  repeatEnabledAt: string | null;
+  autoApproved: boolean;
   account: { name: string; mask: string | null; cardId: string | null };
 };
 type BankData = {
@@ -33,11 +35,12 @@ type BankData = {
     }[];
   }[];
   suggestions: Credit[];
+  repeatRules: { id: string; description: string; amountCents: number }[];
   cards: {
     id: string;
     name: string;
     issuer: string;
-    perks: { id: string; name: string }[];
+    perks: { id: string; name: string; periodType: string }[];
   }[];
 };
 export async function bankRequest(input: Record<string, unknown>) {
@@ -119,7 +122,9 @@ function CreditReview({
   const [date, setDate] = useState(credit.date);
   const [amount, setAmount] = useState(String(-credit.amountCents / 100));
   const [duplicate, setDuplicate] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const card = data.cards.find((card) => card.id === credit.account.cardId);
+  const repeatEligible = card?.id === 'amex-platinum' && credit.candidatePerkIds.length === 1 && card.perks.some(perk => perk.id === credit.candidatePerkIds[0] && perk.periodType === 'monthly' && ['Digital Entertainment Credit', 'Walmart+ Membership'].includes(perk.name));
   return (
     <article className="border-b border-line py-4 space-y-3">
       <div className="flex flex-wrap justify-between gap-2">
@@ -133,6 +138,19 @@ function CreditReview({
         <strong>{formatCurrency(-credit.amountCents / 100)}</strong>
       </div>
       <p className="text-sm text-muted">Posted {formatDateOnly(credit.date)}</p>
+      {credit.autoApproved && <p className="text-sm font-medium text-action">{credit.status === 'undone' ? 'Automatic approval undone' : 'Automatically approved repeat'}</p>}
+      {repeatEligible && !credit.autoApproved && ['approved', 'pending'].includes(credit.status) && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" disabled={busy} checked={!!credit.repeatEnabledAt} onChange={event => void run({ action: 'repeat', id: credit.id, enabled: event.target.checked })} />
+          {credit.status === 'pending' ? 'Already recorded in Activity: match this credit and enable future exact repeats' : 'Auto-approve future exact repeats'}
+        </label>
+      )}
+      {credit.autoApproved && credit.status !== 'undone' && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button disabled={busy} type="button" className="inline-flex items-center gap-2 text-action" onClick={() => { if (confirmUndo) void run({ action: 'undo', id: credit.id }); else setConfirmUndo(true); }}><Undo2 size={16} />{confirmUndo ? 'Confirm undo & pause' : 'Undo approval & pause repeats'}</button>
+          {confirmUndo && <button type="button" disabled={busy} className="text-sm text-muted" onClick={() => setConfirmUndo(false)}>Cancel</button>}
+        </div>
+      )}
       {credit.status === "pending" ? (
         <form
           className="space-y-3"
@@ -243,7 +261,7 @@ function CreditReview({
         >
           {credit.status === "review"
             ? "The bank changed or removed this credit after approval. Check its recorded usage in Activity before making a correction."
-            : "Usage approved. You can edit or remove it from Activity."}
+            : credit.status === 'undone' ? "Usage removed. Repeat approval is paused. This credit will not be re-approved by sync." : "Usage approved. You can edit or remove it from Activity."}
         </p>
       )}
     </article>
@@ -285,7 +303,7 @@ export function BankConnections({
       try {
         await bankRequest(input);
         await load();
-        if (input.action === "approve") await onSaved?.();
+        if (["approve", "undo", "sync", "repeat"].includes(String(input.action))) await onSaved?.();
       } catch (error) {
         setError(error instanceof Error ? error.message : "Please retry.");
       } finally {
@@ -301,7 +319,7 @@ export function BankConnections({
   const credits =
     data?.suggestions.filter((item) =>
       history
-        ? ["approved", "dismissed"].includes(item.status)
+        ? ["approved", "dismissed", "undone"].includes(item.status)
         : ["pending", "review"].includes(item.status),
     ) || [];
   return (
@@ -334,8 +352,7 @@ export function BankConnections({
           {!reviewOnly && (
             <>
               <p className="text-sm text-muted">
-                Read-only transaction access. Review each suggested credit
-                before it is recorded.{" "}
+                Read-only transaction access. Exact repeats can be approved automatically when enabled; other credits need review.{" "}
                 {data.environment === "sandbox" ? "Test environment." : ""}
               </p>
               {!data.configured ? (
@@ -447,6 +464,17 @@ export function BankConnections({
                 </div>
               ))}
             </>
+          )}
+          {!!data.repeatRules.length && (
+            <div className="border-y border-line py-3 space-y-3">
+              <h4 className="text-sm font-semibold">Automatic repeats</h4>
+              {data.repeatRules.map(rule => (
+                <div key={rule.id} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="min-w-0 break-words">{rule.description}<span className="block text-muted">{formatCurrency(-rule.amountCents / 100)} · exact monthly match</span></span>
+                  <button type="button" disabled={busy} title={`Pause repeats for ${rule.description}`} aria-label={`Pause repeats for ${rule.description}`} className="p-2 text-action shrink-0" onClick={() => void run({ action: 'repeat', id: rule.id, enabled: false })}><Pause size={16} /></button>
+                </div>
+              ))}
+            </div>
           )}
           <div className="segment-control">
             <button aria-pressed={!history} onClick={() => setHistory(false)}>

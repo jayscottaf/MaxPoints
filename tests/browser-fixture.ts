@@ -32,6 +32,17 @@ async function main() {
     include: { perks: true },
   });
   const cardIds = [card.id];
+  if (process.env.REPEAT_FIXTURE === '1') {
+    await prisma.userCard.create({ data: { userId: user.id, cardId: 'amex-platinum' } });
+    const perk = await prisma.perk.findFirstOrThrow({ where: { cardId: 'amex-platinum', name: 'Digital Entertainment Credit' } });
+    const connection = await prisma.bankConnection.create({ data: { userId: user.id, itemId: randomUUID(), institutionId: 'test', name: 'American Express', environment: 'sandbox', accounts: { create: { accountId: randomUUID(), name: 'Fixture Platinum', mask: '1234', cardId: 'amex-platinum' } } }, include: { accounts: true } });
+    const previous = new Date(); previous.setUTCDate(10); previous.setUTCMonth(previous.getUTCMonth() - 1);
+    for (const automatic of [false, true]) {
+      const date = automatic ? calendarDate().slice(0, 7) + '-10' : previous.toISOString().slice(0, 10);
+      const usage = await prisma.usage.create({ data: { userId: user.id, perkId: perk.id, amount: 18.99, date: new Date(date + 'T12:00:00Z') } });
+      await prisma.bankTransaction.create({ data: { connectionId: connection.id, accountId: connection.accounts[0].id, transactionId: randomUUID(), description: 'Platinum Digital Entertainment Credit', amountCents: -1899, date, pending: false, currency: 'USD', status: 'approved', usageId: usage.id, candidatePerkIds: [perk.id], autoApproved: automatic, repeatEnabledAt: automatic ? null : previous } });
+    }
+  }
   if (process.env.REMAINDER_FIXTURE === '1') {
     // Reuse read-only catalog terms with an isolated owner's synthetic usage.
     for (const id of ['amex-platinum', 'chase-reserve']) {

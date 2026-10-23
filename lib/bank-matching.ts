@@ -58,7 +58,8 @@ export function matchBankCredit(
       if (
         perk.retired ||
         confirmationNeeded(perk) ||
-        (perk.valueKind && perk.valueKind !== "credit")
+        (perk.valueKind && perk.valueKind !== "credit" &&
+          !(perk.name === "Walmart+ Membership" && perk.valueKind === "membership"))
       )
         return false;
       const range = eligibilityRange(

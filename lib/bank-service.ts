@@ -15,7 +15,8 @@ import {
 } from "./plaid-client";
 import { matchBankCredit } from "./bank-matching";
 import { createUsageInTransaction, UsageError } from "./usage-service";
-import { cents, usageDate } from "./accounting";
+import { calendarDate, cents, eligibilityRange, usageDate } from "./accounting";
+import { normalizedCredit, repeatBenefit, safeRepeatDate } from "./bank-repeat";
 
 type Owner = { id: string; timezone: string };
 export class BankError extends Error {
@@ -231,6 +232,7 @@ export async function syncBankConnection(
   owner: Owner,
   id: string,
   client = plaidClient(),
+  rescan = false,
 ) {
   const connection = await prisma.bankConnection.findFirst({
     where: { id, userId: owner.id, disabledAt: null },
@@ -247,13 +249,13 @@ export async function syncBankConnection(
   const access = decryptBankToken(connection.encryptedToken);
   let added: Transaction[] = [],
     removed: RemovedTransaction[] = [],
-    cursor = connection.cursor || undefined;
+    cursor = rescan ? undefined : connection.cursor || undefined;
   try {
     // Discard the entire staged update if Plaid changes a paginated batch.
     for (let attempt = 0; ; attempt++) {
       added = [];
       removed = [];
-      cursor = connection.cursor || undefined;
+      cursor = rescan ? undefined : connection.cursor || undefined;
       try {
         for (let page = 0; ; page++) {
           if (page >= 25)
@@ -303,6 +305,7 @@ export async function syncBankConnection(
           },
         });
         let suggestions = 0;
+        const newSuggestions: string[] = [];
         const latest = new Map(
           added.map((transaction) => [transaction.transaction_id, transaction]),
         );
@@ -339,7 +342,7 @@ export async function syncBankConnection(
               previous.pending !== values.pending ||
               previous.removed ||
               previous.accountId !== account.id);
-          const status = previous?.usageId
+          const status = previous?.undoneAt ? "undone" : previous?.usageId
             ? changed || !candidates.length
               ? "review"
               : previous.status
@@ -348,7 +351,7 @@ export async function syncBankConnection(
                 ? "pending"
                 : "unmatched"
               : previous.status;
-          await tx.bankTransaction.upsert({
+          const stored = await tx.bankTransaction.upsert({
             where: { transactionId: transaction.transaction_id },
             create: {
               ...values,
@@ -365,6 +368,7 @@ export async function syncBankConnection(
               status,
             },
           });
+          if (!previous && status === "pending") newSuggestions.push(stored.id);
           if (status === "pending") suggestions++;
         }
         for (const transaction of removed) {
@@ -379,9 +383,13 @@ export async function syncBankConnection(
               where: { id: previous.id },
               data: {
                 removed: true,
-                status: previous.usageId ? "review" : "removed",
+                status: previous.undoneAt ? "undone" : previous.usageId ? "review" : "removed",
               },
             });
+        }
+        // Evaluate only after staging the entire batch, including removals and duplicate candidates.
+        for (const suggestionId of newSuggestions) {
+          if (await autoApproveRepeat(tx, owner, suggestionId)) suggestions--;
         }
         await tx.bankConnection.update({
           where: { id },
@@ -401,6 +409,78 @@ export async function syncBankConnection(
     });
     throw error;
   }
+}
+
+async function autoApproveRepeat(tx: Prisma.TransactionClient, owner: Owner, id: string) {
+  const entry = await tx.bankTransaction.findUniqueOrThrow({ where: { id } });
+  if (entry.status !== 'pending' || entry.candidatePerkIds.length !== 1 || entry.pending || entry.removed || entry.currency !== 'USD') return false;
+  const perkId = entry.candidatePerkIds[0];
+  const perk = await tx.perk.findUnique({ where: { id: perkId } });
+  if (!perk || !repeatBenefit(perk)) return false;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${owner.id + ':' + perkId}, 0))`;
+  const anchors = await tx.bankTransaction.findMany({ where: { accountId: entry.accountId, status: 'approved', repeatEnabledAt: { not: null }, undoneAt: null }, orderBy: { repeatEnabledAt: 'desc' } });
+  for (const anchor of anchors) {
+    if (anchor.candidatePerkIds.length !== 1 || anchor.candidatePerkIds[0] !== perkId || anchor.amountCents !== entry.amountCents || normalizedCredit(anchor.description) !== normalizedCredit(entry.description) || !safeRepeatDate(entry.date, anchor.date, anchor.repeatEnabledAt!, calendarDate(new Date(), owner.timezone))) continue;
+    const baseline = anchor.usageId && await tx.usage.findFirst({ where: { id: anchor.usageId, userId: owner.id, perkId, deletedAt: null, needsReview: false } });
+    if (!baseline || cents(baseline.amount) !== -entry.amountCents || baseline.date.toISOString().slice(0, 7) !== anchor.date.slice(0, 7)) continue;
+    const date = usageDate(entry.date, owner.timezone);
+    const range = eligibilityRange(perk, [], date.getUTCFullYear(), date, 'UTC');
+    // Any usage (including unverified imports), or another credit in this month, needs a person.
+    if (await tx.usage.count({ where: { userId: owner.id, perkId, deletedAt: null, date: { gte: range.start, lte: range.end } } })) return false;
+    if (await tx.bankTransaction.count({ where: { id: { not: id }, accountId: entry.accountId, removed: false, candidatePerkIds: { has: perkId }, date: { startsWith: entry.date.slice(0, 7) } } })) return false;
+    try {
+      const usage = await createUsageInTransaction(tx, owner, { perkId, amount: -entry.amountCents / 100, date: entry.date, notes: `Auto-approved repeat bank credit: ${entry.description}. Posted ${entry.date}. Baseline ${anchor.id}.`, idempotencyKey: `plaid:${id}` }, id);
+      await tx.bankTransaction.update({ where: { id }, data: { status: 'approved', autoApproved: true, usageId: usage.id } });
+      return true;
+    } catch (error) {
+      if (error instanceof UsageError) return false;
+      throw error;
+    }
+  }
+  return false;
+}
+
+export async function setRepeatApproval(owner: Owner, id: string, enabled: boolean) {
+  return prisma.$transaction(async tx => {
+    const initial = await tx.bankTransaction.findFirst({ where: { id, connection: { userId: owner.id, disabledAt: null } } });
+    if (!initial) throw new BankError('Credit not found.', 404);
+    await connectionLock(tx, initial.connectionId);
+    const entry = await tx.bankTransaction.findUniqueOrThrow({ where: { id }, include: { account: true } });
+    if (!enabled) {
+      await tx.bankTransaction.update({ where: { id }, data: { repeatEnabledAt: null } });
+      return { ok: true };
+    }
+    if (entry.pending || entry.removed || entry.currency !== 'USD' || entry.amountCents >= 0 || entry.candidatePerkIds.length !== 1 || !['approved', 'pending'].includes(entry.status) || entry.undoneAt) throw new BankError('A verified posted credit is required.');
+    const perkId = entry.candidatePerkIds[0];
+    const perk = await tx.perk.findUnique({ where: { id: perkId } });
+    if (!perk || perk.cardId !== entry.account.cardId || !repeatBenefit(perk)) throw new BankError('Repeat approval is limited to Platinum entertainment and Walmart+ monthly credits.');
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${owner.id + ':' + perkId}, 0))`;
+    const date = usageDate(entry.date, owner.timezone);
+    const range = eligibilityRange(perk, [], date.getUTCFullYear(), date, 'UTC');
+    const matches = await tx.usage.findMany({ where: { userId: owner.id, perkId, deletedAt: null, needsReview: false, amount: -entry.amountCents / 100, date: { gte: range.start, lte: range.end }, ...(entry.usageId ? { id: entry.usageId } : {}) } });
+    if (matches.length !== 1) throw new BankError('Approve or reconcile this exact credit in Activity first. No usage was added.', 409);
+    await tx.bankTransaction.updateMany({ where: { accountId: entry.accountId, candidatePerkIds: { has: perkId } }, data: { repeatEnabledAt: null } });
+    await tx.bankTransaction.update({ where: { id }, data: { status: 'approved', usageId: matches[0].id, repeatEnabledAt: new Date() } });
+    return { ok: true };
+  }, { timeout: 15000 });
+}
+
+export async function undoBankApproval(owner: Owner, id: string) {
+  return prisma.$transaction(async tx => {
+    const initial = await tx.bankTransaction.findFirst({ where: { id, connection: { userId: owner.id } } });
+    if (!initial) throw new BankError('Credit not found.', 404);
+    await connectionLock(tx, initial.connectionId);
+    const entry = await tx.bankTransaction.findUniqueOrThrow({ where: { id } });
+    if (entry.undoneAt) return { ok: true };
+    if (!entry.autoApproved || !entry.usageId) throw new BankError('Only automatic approvals can be undone here.');
+    const usage = await tx.usage.findFirst({ where: { id: entry.usageId, userId: owner.id } });
+    if (!usage) throw new BankError('Recorded usage not found.', 404);
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${owner.id + ':' + usage.perkId}, 0))`;
+    await tx.usage.update({ where: { id: usage.id }, data: { deletedAt: new Date() } });
+    await tx.bankTransaction.updateMany({ where: { accountId: entry.accountId, candidatePerkIds: { has: usage.perkId } }, data: { repeatEnabledAt: null } });
+    await tx.bankTransaction.update({ where: { id }, data: { status: 'undone', undoneAt: new Date(), repeatEnabledAt: null } });
+    return { ok: true };
+  }, { timeout: 15000 });
 }
 
 export async function approveBankCredit(
@@ -476,7 +556,7 @@ export async function approveBankCredit(
         date,
         notes: `Approved bank credit: ${entry.description}. Posted ${entry.date}.`,
         idempotencyKey: `plaid:${entry.id}`,
-      });
+      }, entry.id);
       await tx.bankTransaction.update({
         where: { id },
         data: { status: "approved", usageId: usage.id },

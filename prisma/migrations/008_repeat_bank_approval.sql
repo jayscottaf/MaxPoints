@@ -1,0 +1,1 @@
+ALTER TABLE "BankTransaction" ADD COLUMN "repeatEnabledAt" TIMESTAMP(3), ADD COLUMN "autoApproved" BOOLEAN NOT NULL DEFAULT false, ADD COLUMN "undoneAt" TIMESTAMP(3);

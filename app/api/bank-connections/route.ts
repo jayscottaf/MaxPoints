@@ -12,13 +12,15 @@ import {
   disconnectBank,
   BankError,
   UsageError,
+  setRepeatApproval,
+  undoBankApproval,
 } from "@/lib/bank-service";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export const GET = withOwner(async () => {
   const owner = await getOwner();
-  const [connections, suggestions, cards] = await Promise.all([
+  const [connections, suggestions, cards, repeatRules] = await Promise.all([
     prisma.bankConnection.findMany({
       where: { userId: owner.id, disabledAt: null },
       orderBy: { createdAt: "asc" },
@@ -36,7 +38,7 @@ export const GET = withOwner(async () => {
     prisma.bankTransaction.findMany({
       where: {
         connection: { userId: owner.id },
-        status: { in: ["pending", "review", "approved", "dismissed"] },
+        status: { in: ["pending", "review", "approved", "dismissed", "undone"] },
       },
       orderBy: { updatedAt: "desc" },
       take: 200,
@@ -48,6 +50,8 @@ export const GET = withOwner(async () => {
         status: true,
         candidatePerkIds: true,
         usageId: true,
+        repeatEnabledAt: true,
+        autoApproved: true,
         account: { select: { name: true, mask: true, cardId: true } },
       },
     }),
@@ -57,8 +61,13 @@ export const GET = withOwner(async () => {
         id: true,
         name: true,
         issuer: true,
-        perks: { select: { id: true, name: true } },
+        perks: { select: { id: true, name: true, periodType: true } },
       },
+    }),
+    prisma.bankTransaction.findMany({
+      where: { connection: { userId: owner.id, disabledAt: null }, repeatEnabledAt: { not: null } },
+      select: { id: true, description: true, amountCents: true },
+      orderBy: { repeatEnabledAt: 'desc' },
     }),
   ]);
   return NextResponse.json({
@@ -67,6 +76,7 @@ export const GET = withOwner(async () => {
     connections,
     suggestions,
     cards,
+    repeatRules,
   });
 });
 
@@ -86,8 +96,10 @@ const input = z.discriminatedUnion("action", [
       cardId: z.string().nullable(),
     })
     .strict(),
-  z.object({ action: z.literal("sync"), id: z.string() }).strict(),
+  z.object({ action: z.literal("sync"), id: z.string(), rescan: z.boolean().optional() }).strict(),
   z.object({ action: z.literal("disconnect"), id: z.string() }).strict(),
+  z.object({ action: z.literal("repeat"), id: z.string(), enabled: z.boolean() }).strict(),
+  z.object({ action: z.literal("undo"), id: z.string() }).strict(),
   z
     .object({
       action: z.literal("dismiss"),
@@ -122,6 +134,10 @@ export const POST = withOwner(async (request) => {
     )
       throw new BankError("Plaid setup is not complete yet.", 503);
     switch (data.action) {
+      case "repeat":
+        return NextResponse.json(await setRepeatApproval(owner, data.id, data.enabled));
+      case "undo":
+        return NextResponse.json(await undoBankApproval(owner, data.id));
       case "link":
         return NextResponse.json(await createBankLink(owner));
       case "exchange":
@@ -132,7 +148,7 @@ export const POST = withOwner(async (request) => {
         await mapBankAccount(owner, data.id, data.cardId);
         break;
       case "sync":
-        return NextResponse.json(await syncBankConnection(owner, data.id));
+        return NextResponse.json(await syncBankConnection(owner, data.id, undefined, data.rescan));
       case "disconnect":
         return NextResponse.json(await disconnectBank(owner, data.id));
       case "approve":
